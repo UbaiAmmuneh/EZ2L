@@ -17,7 +17,7 @@ class FailedValidation:
 def type_of_variable(var, check_variables=True):
     import Storage
 
-    if var in RESERVED_WORDS:
+    if var in Storage.RESERVED_WORDS:
         return [Error.UsageOfReservedWordRaiser(var)]
     temp = None
     for variable_type in VARIABLE_TYPES.values():
@@ -367,12 +367,6 @@ class UnknownIdentifier(Variable):
     def validate(value):
         return FailedValidation, Error.UnknownIdentifierRaiser(value)
 
-
-RESERVED_WORDS = [
-    'boolean', 'number', 'string', 'array', 'map', 'node', 'stack', 'queue', 'tree', 'bstree', 'graph', 'delete_var',
-    'typeof', 'print', 'input', 'if', 'else', 'while', 'for', 'from', 'to', 'skip', 'in', 'function', 'return', 'takes',
-    'as',
-]
 
 VARIABLE_TYPES = {
     'null': Null,

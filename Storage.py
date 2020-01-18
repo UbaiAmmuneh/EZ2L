@@ -1,5 +1,12 @@
 from Variables import Number
 
+
+RESERVED_WORDS = [
+    'boolean', 'number', 'string', 'array', 'map', 'node', 'stack', 'queue', 'tree', 'bstree', 'graph', 'delete_var',
+    'typeof', 'print', 'input', 'if', 'else', 'while', 'for', 'from', 'to', 'skip', 'in', 'function', 'return', 'takes',
+    'as',
+]
+
 VARIABLES = {'x': {'class_name': Number, 'value': 1}}
 
 
