@@ -6,19 +6,6 @@ import Error
 import Interpreter
 
 
-def calculate(x):
-    return x
-
-
-def variable_exists(var_name):
-    return var_name.__hash__ is not None and var_name in VARIABLES
-
-
-def get_variable(var_name):
-    if variable_exists(var_name):
-        return VARIABLES[var_name]
-
-
 class SucceededValidation:
     pass
 
@@ -28,6 +15,8 @@ class FailedValidation:
 
 
 def type_of_variable(var, check_variables=True):
+    import Storage
+
     if var in RESERVED_WORDS:
         return [Error.UsageOfReservedWordRaiser(var)]
     temp = None
@@ -36,8 +25,8 @@ def type_of_variable(var, check_variables=True):
         if temp[0] is SucceededValidation:
             return [variable_type, temp[1]]
     if check_variables:
-        if variable_exists(var):
-            variable = get_variable(var)
+        if Storage.variable_exists(var):
+            variable = Storage.get_variable(var)
             return [variable.get('class_name'), variable.get('value')]
     return [temp[1]]
 
@@ -378,8 +367,6 @@ class UnknownIdentifier(Variable):
     def validate(value):
         return FailedValidation, Error.UnknownIdentifierRaiser(value)
 
-
-VARIABLES = {'x': {'class_name': Number, 'value': 1}}
 
 RESERVED_WORDS = [
     'boolean', 'number', 'string', 'array', 'map', 'node', 'stack', 'queue', 'tree', 'bstree', 'graph', 'delete_var',
