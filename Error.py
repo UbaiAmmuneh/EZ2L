@@ -68,7 +68,8 @@ class UsageOfReservedWord(Error):
 
 
 def UsageOfReservedWordRaiser(reserved_word):
-    return UsageOfReservedWord('Can\'t use a reserved word as a name or value.')
+    message = 'Can\'t use a reserved word %s as a name or value.' % reserved_word
+    return UsageOfReservedWord(message)
 
 
 class BadVariableName(Error):
@@ -82,3 +83,12 @@ def BadVariableNameRaiser(name, letter_index):
         message = 'Variable name may contain letters, numbers and underscore, got %s -%s- %s' % \
                   (name[:letter_index], name[letter_index], name[letter_index+1:])
     return BadVariableName(message)
+
+
+class IncomparableItems(Error):
+    pass
+
+
+def IncomparableItemsRaiser(value):
+    message = 'Item %s cannot be compared with other items.' % value
+    return IncomparableItems(message)

@@ -368,6 +368,234 @@ class UnknownIdentifier(Variable):
         return FailedValidation, Error.UnknownIdentifierRaiser(value)
 
 
+class Node:
+    def __init__(self, value=None, next_node=None):
+        self.__value = value
+        self.__next = next_node
+
+    def get_value(self):
+        return self.__value
+
+    def get_next(self):
+        return self.__next
+
+    def set_value(self, value):
+        self.__value = value
+
+    def set_next(self, next_node):
+        self.__next = next_node
+
+
+class BinaryTreeNode:
+    def __init__(self, value):
+        self.__value = value
+        self.__left_child = None
+        self.__right_child = None
+        self.__parent = None
+
+    def get_value(self):
+        return self.__value
+
+    def get_left(self):
+        return self.__left_child
+
+    def get_right(self):
+        return self.__right_child
+
+    def get_parent(self):
+        return self.__parent
+
+    def set_value(self, value):
+        self.__value = value
+
+    def set_left(self, left):
+        self.__left_child = left
+        if type(left) is BinaryTreeNode:
+            left.set_parent(self)
+
+    def set_right(self, right):
+        self.__right_child = right
+        if type(right) is BinaryTreeNode:
+            right.set_parent(self)
+
+    def set_parent(self, parent):
+        self.__parent = parent
+
+    def has_value(self):
+        return self.get_value() is not None
+
+    def has_left(self):
+        return self.get_left() is not None
+
+    def has_right(self):
+        return self.get_right() is not None
+
+    def has_parent(self):
+        return self.get_parent() is not None
+
+    def is_leaf(self):
+        return not self.has_right() and not self.has_left()
+
+    def min_value(self):
+        current = self
+
+        while current.has_left():
+            current = current.get_left()
+
+        return current.get_value()
+
+    def max_value(self):
+        current = self
+
+        while current.has_right():
+            current = current.get_right()
+
+        return current.get_value()
+
+    def search(self, value):
+        try:
+            if self.get_value() == value:
+                return self
+            elif self.get_value() > value:
+                return self.get_left().search(value) if self.has_left() else None
+            else:
+                return self.get_right().search(value) if self.has_right else None
+        except TypeError:
+            raise Error.IncomparableItemsRaiser(value)
+
+    def insert(self, value):
+        try:
+            if self.is_leaf() and not self.has_value():
+                self.set_value(value)
+                return self
+
+            if self.get_value() > value:
+                if not self.has_left():
+                    self.set_left(BinaryTreeNode(value))
+                    return self.get_left()
+                else:
+                    return self.get_left().insert(value)
+            elif self.get_value() < value:
+                if not self.has_right():
+                    self.set_right(BinaryTreeNode(value))
+                    return self.get_right()
+                else:
+                    return self.get_right().insert(value)
+        except TypeError:
+            raise Error.IncomparableItemsRaiser(value)
+
+    def remove(self, value):
+        if value is None:
+            return
+
+        node = self.search(value)
+
+        if node.has_parent():
+            parent = node.get_parent()
+
+            if node.is_leaf():
+                if parent.get_left() == node:
+                    parent.set_left(None)
+                else:
+                    parent.set_right(None)
+
+            else:
+                if node.has_right() and node.has_left():
+                    left = node.get_left()
+                    parent.set_right(node.get_right())
+                    temp = parent.get_right()
+                    while temp.has_left():
+                        temp = temp.get_left()
+                    temp.set_left(left)
+
+                elif not node.has_left():
+                    parent.set_right(node.get_right())
+
+                else:
+                    parent.set_right(node.get_left())
+
+            return self
+
+        else:
+            if node.is_leaf():
+                return None
+
+            if not node.has_right():
+                return node.get_left()
+
+            if not node.has_left():
+                return node.get_right()
+
+            left = node.get_left()
+            right = node.get_right()
+            temp = right
+
+            while temp.has_left():
+                temp = temp.get_left()
+
+            temp.set_left(left)
+
+            return right
+
+    def depth(self):
+        if self.is_leaf():
+            return 1
+        return 1 + max(self.get_left().depth() if self.has_left() else 0,
+                       self.get_right().depth() if self.has_right() else 0)
+
+    def find_max_node_length(self):
+        return max(len(str(self.get_value())),
+                   self.get_left().find_max_node_length() if self.has_left() else -1,
+                   self.get_right().find_max_node_length() if self.has_right() else -1)
+
+    def values_in_level(self, level):
+        if level == 0:
+            return [str(self.get_value())]
+
+        return (self.get_left().values_in_level(level-1) if self.has_left() else [''] * (2 ** (level - 1))) + \
+               (self.get_right().values_in_level(level-1) if self.has_right() else [''] * (2 ** (level - 1)))
+
+    def display(self):
+        node_width = self.find_max_node_length()
+        node_width += ((node_width + 1) % 2)
+        half_node_width = (node_width - 1) // 2
+        depth = self.depth()
+        line_length = (2 ** (depth - 1)) * (node_width + 1) - 1
+        lines = []
+
+        for i in range(depth):
+            space_between = (2 ** (depth - i + 1)) - 3
+            nodes_count = 2 ** i
+            space_around = (line_length - ((nodes_count * node_width) + (space_between * (nodes_count - 1)))) // 2
+
+            values = [('{:^%s.%s}' % (node_width, node_width)).format(j) for j in self.values_in_level(i)]
+
+            line1 = ''
+            line2 = ' ' * space_around
+            line3 = ' ' * space_around
+
+            for j in range(len(values)):
+                _space = (' ' * space_between if j < len(values) - 1 else ' ' * space_around)
+                _divider = '|' if len(values[j].strip()) > 0 else ' '
+                _splitter_half = (2 * half_node_width + len(_space) - 1) // 2
+                if j < len(values) // 2:
+                    _left_splitter = ('_' if len(values[2 * j].strip()) > 0 else ' ') * _splitter_half
+                    _right_splitter = ('_' if len(values[2 * j + 1].strip()) > 0 else ' ') * _splitter_half
+                    cond = len(values[2 * j].strip()) > 0 or len(values[2 * j + 1].strip()) > 0
+                    _splitter = _left_splitter + ('|' if cond else ' ') + _right_splitter
+                    line1 += (' ' * (space_around + half_node_width + 1) + _splitter + _space + ' ' + _space)
+                line2 += (' ' * half_node_width + _divider + ' ' * half_node_width + _space)
+                line3 += (values[j] + _space)
+
+            if i > 0:
+                lines.append(line1)
+                lines.append(line2)
+            lines.append(line3)
+
+        for line in lines:
+            print(line)
+
+
 VARIABLE_TYPES = {
     'null': Null,
     'boolean': Boolean,
@@ -385,10 +613,4 @@ VARIABLE_TYPES = {
 }
 
 if __name__ == '__main__':
-    print(type_of_variable('{a: 1, b:\'2\', c:[1, 2], d:[1,2]}'))
-    print(Map.validate('{a: 1, b:\'2\', c:[x, 2], d:[1,2]}'))
-
-    print(type_of_variable('{a: 1, b:\'2\', c:[1, 2], d:[[1], [2]]}'))
-
-    print(type_of_variable('{a: 1, b:\'2\', x:{c:[1, 2], d:[1,2], e:{f:1, g:[2], h: {x:1}}}}'))
-    print(type_of_variable('[1, \'2\', {a: [2, 3]}]'))
+    pass
