@@ -686,14 +686,17 @@ class Stack:
     def __init__(self):
         self.values = []
 
-    def get_top(self):
+    def top(self):
         return self.values[-1]
 
     def push(self, value):
         self.values.append(value)
 
     def pop(self):
-        return self.values.pop()
+        try:
+            return self.values.pop()
+        except IndexError:
+            pass
 
     def is_empty(self):
         return len(self.values) == 0
@@ -705,6 +708,20 @@ class Stack:
             _reversed.push(self.pop())
 
         self.values = _reversed.values
+
+    def display(self):
+        if len(self.values) > 0:
+            max_node_length = max(len(str(i)) for i in self.values)
+            top_line = ' %s ' % ('_' * (max_node_length + 2))
+            bottom_line = top_line.replace('_', '͞')
+            print(top_line)
+            for i in range(len(self.values)):
+                value = self.values[-i-1]
+                line = ('| {:^%s.%s} |' % (max_node_length, max_node_length)).format(str(value))
+                print(line + (' <- Top' if i == 0 else ''))
+            print(bottom_line)
+        else:
+            print(' __ \n|  |\n ͞͞ \n')
 
 
 class RedBlackTree:
@@ -730,21 +747,19 @@ VARIABLE_TYPES = {
 }
 
 if __name__ == '__main__':
-    x = BinarySearchTree(50)
-    x.insert(25)
-    x.insert(75)
-    x.insert(12)
-    x.insert(38)
-    x.insert(88)
-    x.insert(6)
-    x.insert(18)
-    x.insert(30)
-    x.insert(45)
-    x.insert(80)
-
-    # x.insert(62)
-    # x.insert(56)
-    # x.insert(68)
-    # x.insert(95)
-
+    x = Stack()
     x.display()
+    x.push(2)
+    x.display()
+    x.push(1)
+    x.push(3)
+    x.display()
+    print(x.top())
+    print(x.pop())
+    x.display()
+    x.pop()
+    x.pop()
+    x.display()
+    x.pop()
+    x.display()
+
