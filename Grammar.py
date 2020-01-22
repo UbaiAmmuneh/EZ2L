@@ -1,36 +1,5 @@
 """
-Language Grammar:
 
-Basic Grammar:
-    Each line must end with ';'
-
-Comments:
-    // I am a single line comment
-    /* I am a
-        Multi-line
-        Comment */
-
-Variables:
-    Variable name: same as python
-    Variable types: null: null
-                    boolean: <true / false>
-                    number: <any number including floating points>
-                    string: <'STRING' / "STRING">
-                    array: [DATA]
-                    map: {KEYS: VALUES}
-                    node: node <value>, <value> is required
-                    stack: stack <top>, top is required
-                    queue: queue <head>, head is required
-                    tree: tree <root>, root is required
-                    bstree: bstree <root>, root is required
-                    graph:
-    Variable assignment: <variable_type> <variable_name> = <value>;
-    Deleting Variables: delete_var <var_name>;
-    Get Variable Type: typeof <variable_name>;
-
-Operators:
-        Boolean Operators: &, |, !, ^
-        Numeric Operators: +, -, *, /, **, %
 
 I/O:
     print <printed_text>; // Prints text to screen

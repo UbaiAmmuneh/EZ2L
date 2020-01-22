@@ -92,3 +92,12 @@ class IncomparableItems(Error):
 def IncomparableItemsRaiser(value):
     message = 'Item %s cannot be compared with other items.' % value
     return IncomparableItems(message)
+
+
+class VariableNotFound(Error):
+    pass
+
+
+def VariableNotFoundRaiser(value):
+    message = 'Can\'t find a variable with the name: %s' % value
+    return VariableNotFound(message)

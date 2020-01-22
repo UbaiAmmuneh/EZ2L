@@ -368,25 +368,7 @@ class UnknownIdentifier(Variable):
         return FailedValidation, Error.UnknownIdentifierRaiser(value)
 
 
-class Node:
-    def __init__(self, value=None, next_node=None):
-        self.__value = value
-        self.__next = next_node
-
-    def get_value(self):
-        return self.__value
-
-    def get_next(self):
-        return self.__next
-
-    def set_value(self, value):
-        self.__value = value
-
-    def set_next(self, next_node):
-        self.__next = next_node
-
-
-class BinaryTreeNode:
+class BinarySearchTree:
     def __init__(self, value):
         self.__value = value
         self.__left_child = None
@@ -410,12 +392,12 @@ class BinaryTreeNode:
 
     def set_left(self, left):
         self.__left_child = left
-        if type(left) is BinaryTreeNode:
+        if type(left) is BinarySearchTree:
             left.set_parent(self)
 
     def set_right(self, right):
         self.__right_child = right
-        if type(right) is BinaryTreeNode:
+        if type(right) is BinarySearchTree:
             right.set_parent(self)
 
     def set_parent(self, parent):
@@ -432,6 +414,9 @@ class BinaryTreeNode:
 
     def has_parent(self):
         return self.get_parent() is not None
+
+    def is_empty(self):
+        return not self.has_value() and self.is_leaf()
 
     def is_leaf(self):
         return not self.has_right() and not self.has_left()
@@ -471,13 +456,13 @@ class BinaryTreeNode:
 
             if self.get_value() > value:
                 if not self.has_left():
-                    self.set_left(BinaryTreeNode(value))
+                    self.set_left(BinarySearchTree(value))
                     return self.get_left()
                 else:
                     return self.get_left().insert(value)
             elif self.get_value() < value:
                 if not self.has_right():
-                    self.set_right(BinaryTreeNode(value))
+                    self.set_right(BinarySearchTree(value))
                     return self.get_right()
                 else:
                     return self.get_right().insert(value)
@@ -537,6 +522,27 @@ class BinaryTreeNode:
 
             return right
 
+    def get_all_nodes(self):
+        return self.get_left().get_all_nodes() \
+                if self.has_left() else [] + [self.get_value()] + \
+                self.get_right().get_all_nodes() if self.has_right() else []
+
+    def _balance(self, nodes, start, end):
+        if start > end:
+            return None
+
+        mid = (start + end) // 2
+        node = nodes[mid]
+
+        node.set_left(self._balance(nodes, start, mid - 1))
+        node.set_right(self._balance(nodes, mid + 1, end))
+
+        return node
+
+    def balance(self):
+        nodes = self.get_all_nodes()
+        return self._balance(nodes, 0, len(nodes) - 1)
+
     def depth(self):
         if self.is_leaf():
             return 1
@@ -556,44 +562,161 @@ class BinaryTreeNode:
                (self.get_right().values_in_level(level-1) if self.has_right() else [''] * (2 ** (level - 1)))
 
     def display(self):
+        lines = []
         node_width = self.find_max_node_length()
         node_width += ((node_width + 1) % 2)
-        half_node_width = (node_width - 1) // 2
         depth = self.depth()
-        line_length = (2 ** (depth - 1)) * (node_width + 1) - 1
-        lines = []
+        line_width = (2 ** depth - 1) * node_width
+        spacer1 = (line_width - node_width) // (2 * node_width)
+        space1 = ' ' * node_width * spacer1
 
-        for i in range(depth):
-            space_between = (2 ** (depth - i + 1)) - 3
-            nodes_count = 2 ** i
-            space_around = (line_length - ((nodes_count * node_width) + (space_between * (nodes_count - 1)))) // 2
+        LC = (' ' * (node_width - 1) + '_')
+        RC = ('_' + ' ' * (node_width - 1))
+        SC = (' ' * ((node_width - 1) // 2) + '|' + ' ' * ((node_width - 1) // 2))
+        _ = '_' * node_width
 
-            values = [('{:^%s.%s}' % (node_width, node_width)).format(j) for j in self.values_in_level(i)]
-
+        for level in range(depth):
+            spacer2 = 2 * spacer1 + 1
+            space2 = ' ' * node_width * spacer2
             line1 = ''
-            line2 = ' ' * space_around
-            line3 = ' ' * space_around
+            line2 = space1
+            line3 = space1
+            values = [('{:^%s.%s}' % (node_width, node_width)).format(j) for j in self.values_in_level(level)]
+            for i in range(len(values)):
+                if i < len(values) // 2:
+                    cond1 = len(values[i * 2].strip()) > 0
+                    cond2 = len(values[i * 2 + 1].strip()) > 0
+                    left = (LC + _ * spacer1 if cond1 else ' ' * (node_width + node_width*spacer1))
+                    right = (_ * spacer1 + RC if cond2 else ' ' * (node_width + node_width*spacer1))
+                    middle = (('_' if cond1 else ' ') * ((node_width - 1) // 2) +
+                              ('|' if(cond1 or cond2) else ' ') +
+                              ('_' if cond2 else ' ') * ((node_width - 1) // 2))
+                    ___ = left + middle + right
+                    line1 += (space1 + ___ + space1 + ' ' * node_width)
 
-            for j in range(len(values)):
-                _space = (' ' * space_between if j < len(values) - 1 else ' ' * space_around)
-                _divider = '|' if len(values[j].strip()) > 0 else ' '
-                _splitter_half = (2 * half_node_width + len(_space) - 1) // 2
-                if j < len(values) // 2:
-                    _left_splitter = ('_' if len(values[2 * j].strip()) > 0 else ' ') * _splitter_half
-                    _right_splitter = ('_' if len(values[2 * j + 1].strip()) > 0 else ' ') * _splitter_half
-                    cond = len(values[2 * j].strip()) > 0 or len(values[2 * j + 1].strip()) > 0
-                    _splitter = _left_splitter + ('|' if cond else ' ') + _right_splitter
-                    line1 += (' ' * (space_around + half_node_width + 1) + _splitter + _space + ' ' + _space)
-                line2 += (' ' * half_node_width + _divider + ' ' * half_node_width + _space)
-                line3 += (values[j] + _space)
+                line2 += (SC if len(values[i].strip()) > 0 else ' ' * node_width) + space2
+                line3 += values[i] + space2
 
-            if i > 0:
+            if level > 0:
                 lines.append(line1)
                 lines.append(line2)
             lines.append(line3)
+            spacer1 = (spacer1 - 1) // 2
+            space1 = ' ' * node_width * spacer1
 
         for line in lines:
-            print(line)
+            print(line.rstrip())
+
+
+class LinkedList:
+    def __init__(self, value):
+        self.__value = value
+        self.__next = None
+        self.__prev = None
+
+    def get_value(self):
+        return self.__value
+
+    def get_next(self):
+        return self.__next
+
+    def get_prev(self):
+        return self.__prev
+
+    def set_value(self, value):
+        self.__value = value
+
+    def set_next(self, next_):
+        self.__next = next_
+
+        if next_ is not None:
+            next_.set_prev(self)
+
+    def set_prev(self, prev):
+        self.__prev = prev
+
+    def is_empty(self):
+        return self.get_value() is None and self.get_next() is None
+
+    def insert_at_head(self, value):
+        old_value = self.get_value()
+        old_next = self.get_next()
+        self.set_value(value)
+        self.set_next(LinkedList(old_value))
+        self.get_next().set_next(old_next)
+
+    def insert_at_end(self, value):
+        temp = self
+
+        while temp.get_next() is not None:
+            temp = temp.get_next()
+
+        temp.set_next(LinkedList(value))
+
+    def search(self, value):
+        temp = self
+
+        while temp is not None:
+            if temp.get_value() == value:
+                break
+            temp = temp.get_next()
+
+        return temp
+
+    def delete(self, value):
+        node = self.search(value)
+
+        if node.get_prev() is not None:
+            node.get_prev().set_next(node.get_next())
+        else:
+            self.set_value(self.get_next().get_value())
+            self.set_next(self.get_next().get_next())
+
+    def display(self):
+        temp = self
+
+        while temp.get_next() is not None:
+            print(str(temp.get_value()) + ' <--> ', end='')
+            temp = temp.get_next()
+
+        print(temp.get_value())
+
+
+class Stack:
+    def __init__(self):
+        self.values = []
+
+    def get_top(self):
+        return self.values[-1]
+
+    def push(self, value):
+        self.values.append(value)
+
+    def pop(self):
+        return self.values.pop()
+
+    def is_empty(self):
+        return len(self.values) == 0
+
+    def reverse(self):
+        _reversed = Stack()
+
+        while not self.is_empty():
+            _reversed.push(self.pop())
+
+        self.values = _reversed.values
+
+
+class RedBlackTree:
+    pass
+
+
+class AVLTree:
+    pass
+
+
+class Graph:
+    pass
 
 
 VARIABLE_TYPES = {
@@ -603,14 +726,25 @@ VARIABLE_TYPES = {
     'string': String,
     'array': Array,
     'map': Map,
-    # 'node': Node,
-    # 'stack': Stack,
-    # 'queue': Queue,
-    # 'tree': Tree,
-    # 'bstree': BSTree,
-    # 'graph': Graph,
     'unknown': UnknownIdentifier
 }
 
 if __name__ == '__main__':
-    pass
+    x = BinarySearchTree(50)
+    x.insert(25)
+    x.insert(75)
+    x.insert(12)
+    x.insert(38)
+    x.insert(88)
+    x.insert(6)
+    x.insert(18)
+    x.insert(30)
+    x.insert(45)
+    x.insert(80)
+
+    # x.insert(62)
+    # x.insert(56)
+    # x.insert(68)
+    # x.insert(95)
+
+    x.display()
