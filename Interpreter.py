@@ -1,4 +1,6 @@
-from Variables import SucceededValidation, FailedValidation
+from Error import SucceededValidation, FailedValidation
+import Operations
+from PrimitiveDataStructures import Variable
 
 
 class Interpreter:
@@ -8,13 +10,18 @@ class Interpreter:
     @staticmethod
     def run_single_command(command):
         if '(' in command:
-            start = command.index('(')
-            end = len(command) - 1 - [command[i] for i in range(len(command) - 1, -1, -1)].index(')')
-            return Interpreter.run_single_command(command[:start] +
-                                                  Interpreter.run_single_command(command[start + 1:end]) +
-                                                  command[end + 1:])
+            start, end = Variable.find_parens(command, '(', ')')[0]
+            inner = Interpreter.run_single_command(command[start + 1:end])
+            if inner[0] is FailedValidation:
+                raise inner[1]
+            return Interpreter.run_single_command(command[:start] + inner[1] + command[end + 1:])
 
-        return SucceededValidation, command
+        result = Operations.Operation.perform(command)
+        if result[0] is SucceededValidation:
+            if result[1] is not None:
+                print(result[1])
+        else:
+            raise result[1]
 
     @staticmethod
     def run_function(function_body):

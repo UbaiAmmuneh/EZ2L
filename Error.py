@@ -1,3 +1,11 @@
+class SucceededValidation:
+    pass
+
+
+class FailedValidation:
+    pass
+
+
 class Error(Exception):
     pass
 

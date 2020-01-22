@@ -1,10 +1,4 @@
 """
-
-
-I/O:
-    print <printed_text>; // Prints text to screen
-    x = input; // Takes input and saves it to the variable x, if x doesnt exist, a new variable with the name x will be created.
-
 Conditions:
     Syntax:
         if <condition> {
@@ -45,8 +39,6 @@ Loops:
             for <iterator_variable_name> in <data_structure> {
                 DO SOMETHING;
             }
-
-            * Notice that supported data structures in this type of loops are: string, array, map, node, stack and queue.
 
 Functions:
     Syntax:

@@ -1,4 +1,4 @@
-from Variables import Number
+from PrimitiveDataStructures import *
 
 
 RESERVED_WORDS = [

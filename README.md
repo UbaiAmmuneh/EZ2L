@@ -23,6 +23,76 @@ EZData has an easy understandable syntax.<br>
 
   +      if(length of (join 'a' with 'b')) {  // Note the '(' before the join keyword
 
+# I/O
+EZData has basic I/O implementation, it has 2 main functions for the I/O process.<br>
++ ##### Outputting to screen:
+  Outputs are displayed using the `print` keyword. Example:
+  <pre>
+    print('Hello World!');
+    
+    Output:
+    
+    'Hello World!'
+  </pre>
+  The `print` can take an argument to determine the end of the printed text, default is newline (`\n`).
+  <pre>
+    print('Line 1', end with ' ');
+    print('Line 2', end with '\nNew Line\n');
+    print('Line 3');
+    
+    Output:
+    Line 1 Line 2
+    New Line
+    Line 3
+  </pre>
+  In order to print a variable connected to a string use the special symbol `${variable_name}` in string.
+  <pre>
+    x = 1;
+    print('x is ${x}!');
+    
+    Output:
+    
+    'x is 1!'
+    ''
+  </pre>
+  ##### String Escaping:
+  Strings can include special characters that have different rules on display from other strings.<br>
+  Here is a list of most common String Escape Sequences:
+  
+  <pre>
+        Escape Sequence  |      Meaning
+       __________________|_______________________________________
+             \\          |   Back Slash(\)
+             \'          |   Single Quote(')
+             \"          |   Double Quote(")
+             \a          |   ASCII Bell (BEL)
+             \b          |   ASCII Backspace (BS)
+             \f          |   ASCII Formfeed (FF)
+             \n          |   ASCII Linefeed (LF)
+             \r          |   ASCII Carriage Return (CR)
+             \t          |   ASCII Horizontal Tab (TAB)
+             \v          |   ASCII Vertical Tab (VT)
+             \ooo        |   ASCII character with octal value ooo
+             \xhh...     |   ASCII character with hex value hh...
+             \$          |   Dollar Sign
+  </pre>
+     
++ ##### Taking inputs from user:
+  Inputs from user are taken using the `input` keyword. Example:
+  <pre>
+    print('Enter a number:', end with ' ');
+    number = input;
+    print('You entered ${number}');
+    
+    Output:
+    
+    Enter a number: 5
+    You entered 5
+  </pre>
+
++ ##### Working with files
+      ... Coming Soon ...
+
 # Variables
 
 ###
@@ -149,7 +219,6 @@ Slicing String: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`print(sli
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`print(slice z start 13);` &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Outputs: &nbsp; `End`<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`print(slice z start 6 end 12);` &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Outputs: &nbsp; `Middle`<br>
 
-
 ### Non-Primitive Data Structures:
 
 Non-primitive types are the sophisticated members of the data structure family. They don't just store a value, but rather a collection of values in various formats.
@@ -206,6 +275,9 @@ Slicing Array: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; `print(slice [1,
     ... Coming Soon ...
     
 #### AVL Tree:
+    ... Coming Soon ...
+    
+#### WAVL Tree:
     ... Coming Soon ...
 
 #### Stack:
