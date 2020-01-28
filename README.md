@@ -14,14 +14,14 @@ EZData has an easy understandable syntax.<br>
 + There are 2 types of comments:
   + Inline Comments: this kind of comments are placed at the end of a line of code, and must be preceded by `//`
   + Multi-Line Comments: comments that need to be on multiple lines must be written between `/*` and `*/`<br><br>
-    +     print('Hello World!');  // I am an inline comment
+         <pre>print('Hello World!');  // I am an inline comment
           /* I am a 
              Multi-Line
              Comment
-          */ 
+          */ </pre>
 + Nesting operation inside another one or a data structure inside other needs to be included inside pair of parenthesis:
 
-  +      if(length of (join 'a' with 'b')) {  // Note the '(' before the join keyword
+        if(length of (join 'a' with 'b')) {  // Note the '(' before the join keyword
 
 # I/O
 EZData has basic I/O implementation, it has 2 main functions for the I/O process.<br>

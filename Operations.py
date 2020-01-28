@@ -44,10 +44,6 @@ class InputOp:
         return input()
 
 
-class temp:
-    pass
-
-
 def find_operation(command):
     par = command if ' ' not in command else command[:command.index(' ')]
     for op in OPERATIONS:
