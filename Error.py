@@ -109,3 +109,30 @@ class VariableNotFound(Error):
 def VariableNotFoundRaiser(value):
     message = 'Can\'t find a variable with the name: %s' % value
     return VariableNotFound(message)
+
+
+class BadSyntax(Error):
+    pass
+
+
+def BadSyntaxRaiser(command, correct_syntax):
+    message = 'Bad syntax provided, %s doesnt match the syntax %s.' % (command, correct_syntax)
+    return BadSyntax(message)
+
+
+class SemiColonMissing(Error):
+    pass
+
+
+def SemiColonMissingRaiser(keyword, command):
+    message = 'Operation %s needs to end with a semicolon - \';\', %s doesnt.' % (keyword, command)
+    return SemiColonMissing(message)
+
+
+class UnknownOperation(Error):
+    pass
+
+
+def UnknownOperationRaiser(op):
+    message = 'Unknown operation: %s' % op
+    return UnknownOperation(message)

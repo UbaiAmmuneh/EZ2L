@@ -45,16 +45,7 @@ EZData has basic I/O implementation, it has 2 main functions for the I/O process
     New Line
     Line 3
   </pre>
-  In order to print a variable connected to a string use the special symbol `${variable_name}` in string.
-  <pre>
-    x = 1;
-    print('x is ${x}!');
-    
-    Output:
-    
-    'x is 1!'
-    ''
-  </pre>
+  
   ##### String Escaping:
   Strings can include special characters that have different rules on display from other strings.<br>
   Here is a list of most common String Escape Sequences:
@@ -74,7 +65,6 @@ EZData has basic I/O implementation, it has 2 main functions for the I/O process
              \v          |   ASCII Vertical Tab (VT)
              \ooo        |   ASCII character with octal value ooo
              \xhh...     |   ASCII character with hex value hh...
-             \$          |   Dollar Sign
   </pre>
      
 + ##### Taking inputs from user:
