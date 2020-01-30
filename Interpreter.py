@@ -87,23 +87,8 @@ class Interpreter:
 
 if __name__ == '__main__':
     pass
-    # Interpreter.run_single_command("print(1 + 2 + x);", True)
-    # Interpreter.run_single_command("print(1 * 2 * x);", True)
-    # Interpreter.run_single_command("print(1 - 2 - x);", True)
-    # Interpreter.run_single_command("print(1 / 2 / x / 2);", True)
-    # Interpreter.run_single_command("print(15% 6%2);", True)
-    # Interpreter.run_single_command("print(-2);", True)
-    # Interpreter.run_single_command("print(-2 + 1 * 3);", True)
-    # Interpreter.run_single_command("print(15% 6%2);", True)
-
-    #
-    #
-    #
-    # Interpreter.run_single_command("x = true;", True)
-    # Interpreter.run_single_command("print(x);", True)
-    # Interpreter.run_single_command("print(true);", True)
-
-    # Interpreter.run_single_command("print(1 + 2 - 3);", True)
+    Interpreter.run_single_command("x = x+1;", True)
+    Interpreter.run_single_command("print(x);", True)
 
     # x = """
     # x =1;

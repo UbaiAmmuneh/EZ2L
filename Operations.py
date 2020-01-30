@@ -22,7 +22,7 @@ def find_operations(command):
 class PrintOp:
     keyword = 'print'
     structure = r'print\s*\(\s*(.*?)\s*\)'
-    power = 0
+    power = -1
 
     @staticmethod
     def perform(command):
@@ -295,7 +295,7 @@ class NumericPowerOp:
 class BooleanAndOp:
     keyword = 'and'
     structure = r'\s*([0-9a-zA-Z._\-]+)\s*and\s*([\d0-9a-zA-Z._]+)\s*?'
-    power = 2
+    power = 3
 
     @staticmethod
     def perform(command):
@@ -323,6 +323,91 @@ class BooleanAndOp:
         return op1[1] and op2[1]
 
 
+class BooleanOrOp:
+    keyword = 'or'
+    structure = r'\s*([0-9a-zA-Z._\-]+)\s*or\s*([\d0-9a-zA-Z._]+)\s*?'
+    power = 1
+
+    @staticmethod
+    def perform(command):
+        match = re.findall(BooleanOrOp.structure, command)
+
+        if len(match) == 0:
+            raise Error.BadSyntaxRaiser(command, '<operator1> or <operator2>')
+
+        match = match[0]
+        op1 = type_of_variable(match[0])
+        op2 = type_of_variable(match[1])
+
+        if len(op1) == 1:
+            raise op1[0]
+
+        if len(op2) == 1:
+            raise op2[0]
+
+        if not op1[0] is Boolean:
+            raise Error.WrongOperationArgumentTypeRaiser('or', op1, 'boolean')
+
+        if not op2[0] is Boolean:
+            raise Error.WrongOperationArgumentTypeRaiser('and', op2, 'boolean')
+
+        return op1[1] or op2[1]
+
+
+class BooleanXorOp:
+    keyword = 'xor'
+    structure = r'\s*([0-9a-zA-Z._\-]+)\s*xor\s*([\d0-9a-zA-Z._]+)\s*?'
+    power = 2
+
+    @staticmethod
+    def perform(command):
+        match = re.findall(BooleanXorOp.structure, command)
+
+        if len(match) == 0:
+            raise Error.BadSyntaxRaiser(command, '<operator1> xor <operator2>')
+
+        match = match[0]
+        op1 = type_of_variable(match[0])
+        op2 = type_of_variable(match[1])
+
+        if len(op1) == 1:
+            raise op1[0]
+
+        if len(op2) == 1:
+            raise op2[0]
+
+        if not op1[0] is Boolean:
+            raise Error.WrongOperationArgumentTypeRaiser('xor', op1, 'boolean')
+
+        if not op2[0] is Boolean:
+            raise Error.WrongOperationArgumentTypeRaiser('xor', op2, 'boolean')
+
+        return op1[1] ^ op2[1]
+
+
+class BooleanNotOp:
+    keyword = 'not'
+    structure = r'\s*not\s*([\d0-9a-zA-Z._]+)\s*?'
+    power = 4
+
+    @staticmethod
+    def perform(command):
+        match = re.findall(BooleanNotOp.structure, command)
+
+        if len(match) == 0:
+            raise Error.BadSyntaxRaiser(command, 'not <operator>')
+
+        op = type_of_variable(match[0])
+
+        if len(op) == 1:
+            raise op[0]
+
+        if not op[0] is Boolean:
+            raise Error.WrongOperationArgumentTypeRaiser('not', op, 'boolean')
+
+        return not op[1]
+
+
 OPERATIONS = {
     'print': PrintOp,
     'input': InputOp,
@@ -334,5 +419,11 @@ OPERATIONS = {
     '/': NumericDivisionOp,
     '%': NumericModuloOp,
     '**': NumericPowerOp,
-    'and': BooleanAndOp
+    'and': BooleanAndOp,
+    'or': BooleanOrOp,
+    'xor': BooleanXorOp,
+    'not': BooleanNotOp,
 }
+
+# ** > *, /, % > +, -
+# not > and > xor > or

@@ -102,7 +102,7 @@ class Boolean(Variable):
 
     @staticmethod
     def validate(value):
-        values = {'true': True, 'false': False}
+        values = {'true': True, 'false': False, 'True': True, 'False': False}
         if value.__hash__ is not None and value in values:
             return Error.SucceededValidation, values.get(value)
         return Error.FailedValidation, Error.IdentifierDoesntMatchValueRaiser('boolean', value)
