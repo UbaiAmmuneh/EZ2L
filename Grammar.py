@@ -4,6 +4,9 @@ Conditions:
         if <condition> {
             DO SOMETHING;
         }
+        else if <condition2> {
+            DO SOMETHING2;
+        }
         else {
             DO SOMETHING ELSE;
         }
@@ -46,8 +49,6 @@ Functions:
             FUNCTION BODY;
             return <value>;
         }
-
-        * Every function must return a value, if you want to build a function that doesnt return value, return NO_VALUE;
 
     Another syntax for functions that take unknown number of arguments:
         function <function_name> takes from <from> to <to> as <name> (<arguments> {

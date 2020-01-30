@@ -136,3 +136,21 @@ class UnknownOperation(Error):
 def UnknownOperationRaiser(op):
     message = 'Unknown operation: %s' % op
     return UnknownOperation(message)
+
+
+class WrongOperationArgumentType(Error):
+    pass
+
+
+def WrongOperationArgumentTypeRaiser(op, arg, required_type):
+    message = 'Operation %s require arguments of type %s, got %s.' % (op, required_type, arg)
+    return WrongOperationArgumentType(message)
+
+
+class WrongOperationArgumentCount(Error):
+    pass
+
+
+def WrongOperationArgumentCountRaiser(op, required_args_count, command):
+    message = 'Operation %s requires %s arguments, got %s' % (op, required_args_count, command)
+    return WrongOperationArgumentCount(message)

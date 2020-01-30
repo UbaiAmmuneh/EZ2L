@@ -1,7 +1,23 @@
 import Error
 
 
+def load_variables():
+    pass
+
+
+def add_variable(var_name, var_type, var_value):
+    VARIABLES[var_name] = {'class_name': var_type, 'value': var_value}
+
+
+def delete_variable(var_name):
+    if var_name not in VARIABLES:
+        raise Error.VariableNotFoundRaiser(var_name)
+
+    del VARIABLES[var_name]
+
+
 def variable_exists(var_name):
+    load_variables()
     return var_name.__hash__ is not None and var_name in VARIABLES
 
 
@@ -15,6 +31,8 @@ def type_of_variable(var, check_variables=True):
 
     for _ in VARIABLE_TYPES:
         variable_type = VARIABLE_TYPES.get(_)
+        if var is None:
+            return [Error.UnknownIdentifierRaiser(var)]
         if variable_type.simple_validate(_, var):
             temp = variable_type.validate(var)
             if temp[0] is Error.SucceededValidation:

@@ -21,7 +21,9 @@ EZData has an easy understandable syntax.<br>
           */ </pre>
 + Nesting operation inside another one or a data structure inside other needs to be included inside pair of parenthesis:
 
-        if(length of (join 'a' with 'b')) {  // Note the '(' before the join keyword
+        if(length of (join 'a' with 'b')) {                // Note the '(' before the join keyword
+            // .....
+        }
 
 # I/O
 EZData has basic I/O implementation, it has 2 main functions for the I/O process.<br>
@@ -96,13 +98,13 @@ Variables can be also deleted for space efficiency by using the `del` keyword.
 Example:
 
     x = 1;
-    print(typeof x); // Number
+    print(typeof x);  // Number
     
     x = 'Hi';
-    print(typeof x); // String
+    print(typeof x);  // String
     
     del x;
-    print(x); // Error.VariableNotFound
+    print(x);         // Error
 
 The `typeof` keyword is used to get variable's type in the syntax shown above in the example.
 
