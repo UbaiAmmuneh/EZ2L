@@ -87,7 +87,7 @@ class Interpreter:
 
 if __name__ == '__main__':
     pass
-    Interpreter.run_single_command("x = x+1;", True)
+    Interpreter.run_single_command("modulo x by x+1;", True)
     Interpreter.run_single_command("print(x);", True)
 
     # x = """
