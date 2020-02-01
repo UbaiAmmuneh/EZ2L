@@ -802,12 +802,8 @@ VARIABLE_TYPES = {
     'map': Map,
 }
 
-# from Operations import OPERATIONS
+from Operations import OPERATIONS
 
-RESERVED_WORDS = [
-                     'boolean', 'number', 'string', 'array', 'map', 'print',
-                     # 'typeof', 'if', 'else', 'while', 'for', 'from', 'to', 'skip', 'in', 'function', 'return',
-                     # 'takes', 'as',
-                 ]  # + list(OPERATIONS.keys())
+RESERVED_WORDS = list(VARIABLE_TYPES.keys()) + list(OPERATIONS.keys())
 
 VARIABLES = {'x': {'class_name': Number, 'value': 1}}
