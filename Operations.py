@@ -1,771 +1,421 @@
-import re
+from Error import SucceededValidation, FailedValidation
+from Variables import *
 
-import Error
-from Interpreter import Interpreter
-from Variables import type_of_variable, add_variable, delete_variable, variable_exists, get_variable, \
-    Variable, Number, Boolean
 
+def convert_to_string(_):
+    return str(_) if type_of_variable(_)[0] is not String else "'%s'" % _
 
-def check_semicolon(keyword, command):
-    if command[-1] != ';':
-        raise Error.SemiColonMissingRaiser(keyword, command)
 
+def run_command(command, previous_ops=None):
+    if command is None or previous_ops == []:
+        return SucceededValidation, command
 
-def find_operations(command):
-    ops = []
-    for op in OPERATIONS:
-        if command.find(OPERATIONS[op].keyword) > -1:
-            ops.append(OPERATIONS[op])
+    command_is_var = type_of_variable(command)
 
-    return ops
+    if len(command_is_var) > 1:
+        return SucceededValidation, command_is_var[1]
 
+    if '(' in command:
+        start, end = Variable.find_parens(command, '(', ')')[-1]
+        inner = run_command(command[start + 1: end])
 
-class PrintOp:
-    keyword = 'print'
-    structure = r'print\s*\(\s*(.*?)\s*\)'
-    power = -1
+        if inner[0] is FailedValidation:
+            raise inner[1]
 
-    @staticmethod
-    def perform(command):
-        match = re.findall(PrintOp.structure, command)
+        return run_command(command[:start] + convert_to_string(inner[1]) + command[end + 1:])
 
-        if len(match) == 0:
-            raise Error.BadSyntaxRaiser(command, 'print(<output>)')
+    ops = sorted(sorted([op for op in OPERATIONS if op in command], key=lambda op: -OPERATIONS[op]['power']),
+                 key=lambda op: -len(re.findall(OPERATIONS[op]['structure'], command)))
 
-        match = match[0]
+    if len(ops) == 0:
+        raise Error.UnknownOperationRaiser(command)
 
-        output = Interpreter.run_single_command(match)
+    operation = ops[0]
 
-        if len(output) == 1:
-            raise output[0]
+    match = re.search(OPERATIONS[operation]['structure'], command)
+    groups = re.findall(OPERATIONS[operation]['structure'], command) if match is not None else None
+    _ = groups[0] if type(groups[0]) is tuple else groups
 
-        print(output[1])
+    if groups is None or not OPERATIONS[operation]['args_expected'](len(_)):
+        raise Error.BadSyntaxRaiser(command, OPERATIONS[operation]['correct_form'])
 
+    _groups = []
+    for i in _:
+        if i != '':
+            _groups.append(i)
 
-class InputOp:
-    keyword = 'input'
-    structure = r'input'
-    power = 10
+    if operation == 'or' and _groups[1] == 'equal':
+        operation = '%s or equal than' % _groups[0]
+        match = re.search(OPERATIONS[operation]['structure'], command)
+        groups = re.findall(OPERATIONS[operation]['structure'], command) if match is not None else None
+        _ = groups[0] if type(groups[0]) is tuple else groups
 
-    @staticmethod
-    def perform(command):
-        match = re.match(InputOp.structure, command)
+        if groups is None or not OPERATIONS[operation]['args_expected'](len(_)):
+            raise Error.BadSyntaxRaiser(command, OPERATIONS[operation]['correct_form'])
 
-        if match is None:
-            raise Error.BadSyntaxRaiser(command, 'input')
+        _groups = []
+        for i in _:
+            if i != '':
+                _groups.append(i)
 
-        return input()
+    result = OPERATIONS[operation]['function'](_groups)
 
+    updated_command = command.replace(command[match.start(): match.end()],
+                                      convert_to_string(result) if result is not None else '')
 
-class VariableAssignmentOp:
-    keyword = '='
-    structure = r'(\w+)\s=\s*([^;]*);?'
-    power = 0
+    return run_command(updated_command, ops[1:])
 
-    @staticmethod
-    def perform(command):
-        match = re.findall(VariableAssignmentOp.structure, command)
 
-        if len(match) == 0:
-            raise Error.BadSyntaxRaiser(command, '<var_name> = <value>')
+def run_print(groups):
+    output = run_command(groups[0])
 
-        match = match[0]
-        var_name = Variable.check_name(match[0])
-        var_value = Interpreter.run_single_command(match[1], get_type_of_var=True)
+    if output[0] is FailedValidation:
+        raise output[1]
 
-        if var_name[0] is Error.FailedValidation:
-            raise var_name[1]
+    if output[1] is not None:
+        _ = '\n'
+        if len(groups) == 2:
+            end = run_command(groups[1])
 
-        if var_value[0] is Error.FailedValidation:
-            raise var_value[1][0]
+            if end[0] is FailedValidation:
+                raise end[1]
 
-        add_variable(var_name[1], var_value[1][0], var_value[1][1])
+            type_of_end = type_of_variable(end[1])
 
+            if type_of_end[0] is String:
+                _ = type_of_end[1]
 
-class VariableDeletionOp:
-    keyword = 'del'
-    structure = r'del\s*(\w+)'
-    power = 0
+            else:
+                raise Error.WrongOperationArgumentTypeRaiser('print <output> end with <end>', groups[1], 'string')
 
-    @staticmethod
-    def perform(command):
-        match = re.findall(VariableDeletionOp.structure, command)
+        print(output[1], end=_)
 
-        if len(match) == 0:
-            raise Error.BadSyntaxRaiser(command, 'del <var_name>')
 
-        match = match[0]
-        var_name = Variable.check_name(match[0])
+def run_input(groups):
+    _ = ''
 
-        if var_name[0] is Error.FailedValidation:
-            raise var_name[1]
+    if len(groups) == 1:
+        msg = run_command(groups[0])
 
-        delete_variable(var_name[1])
+        if msg[0] is FailedValidation:
+            raise msg[1]
 
+        type_of_msg = type_of_variable("'%s'" % msg[1])
 
-class NumericAdditionOp:
-    keyword = '+'
-    structure = r'\s*([0-9a-zA-Z._\-]+)\s*\+\s*([\d0-9a-zA-Z._]+)\s*?'
-    power = 1
+        if type_of_msg[0] is String:
+            _ = type_of_msg[1]
+        else:
+            raise Error.WrongOperationArgumentTypeRaiser('input message <message>', groups[0], 'string')
 
-    @staticmethod
-    def perform(command):
-        match = re.findall(NumericAdditionOp.structure, command)
+    return "'%s'" % input(_)
 
-        if len(match) == 0:
-            raise Error.BadSyntaxRaiser(command, '<operator1> + <operator2>')
 
-        match = match[0]
-        op1 = type_of_variable(match[0])
-        op2 = type_of_variable(match[1])
+def run_typeof(groups):
+    var = run_command(groups[0])
 
-        if len(op1) == 1:
-            raise op1[0]
+    if var[0] is FailedValidation:
+        raise var[1]
 
-        if len(op2) == 1:
-            raise op2[0]
+    var_type = type_of_variable(convert_to_string(var[1]))
 
-        if not op1[0] is Number:
-            raise Error.WrongOperationArgumentTypeRaiser('+', op1, 'number')
+    if len(var_type) == 1:
+        raise var_type[0]
 
-        if not op2[0] is Number:
-            raise Error.WrongOperationArgumentTypeRaiser('+', op2, 'number')
+    return "'%s'" % var_type[0].keyword
 
-        return op1[1] + op2[1]
 
+def run_set(groups):
+    var_name = Variable.check_name(groups[0])
+    var_value = run_command(groups[1])
 
-class NumericSubtractionOp:
-    keyword = '-'
-    structure = r'\s*([0-9a-zA-Z._\-]+)\s*[-]\s*([\d0-9a-zA-Z._]+)\s*?'
-    power = 1
+    if var_name[0] is FailedValidation:
+        raise var_name[1]
 
-    @staticmethod
-    def perform(command):
-        match = re.findall(NumericSubtractionOp.structure, command)
+    if var_value[0] is FailedValidation:
+        raise var_value[1]
 
-        if len(match) == 0:
-            _ = re.match(r'.*?([-][0-9]+)[)\s]*;?$', command)
-            if _ is not None:
-                return type_of_variable(_.groups()[0])[1]
+    var_type = type_of_variable(var_name[1])
 
-            raise Error.BadSyntaxRaiser(command, '<operator1> - <operator2>')
+    if len(var_type) == 1:
+        raise var_type[0]
 
-        match = match[0]
-        op1 = type_of_variable(match[0])
-        op2 = type_of_variable(match[1])
+    add_variable(var_name[1], var_type, var_value[1])
 
-        if len(op1) == 1:
-            raise op1[0]
 
-        if len(op2) == 1:
-            raise op2[0]
+def run_del(groups):
+    delete_variable(groups[0])
 
-        if not op1[0] is Number:
-            raise Error.WrongOperationArgumentTypeRaiser('-', op1, 'number')
 
-        if not op2[0] is Number:
-            raise Error.WrongOperationArgumentTypeRaiser('-', op2, 'number')
+def run_dual_arg_op(groups, op, f, _type, _type_in_words=None, check_for_type=True, _types=None):
+    op1 = run_command(groups[0])
+    op2 = run_command(groups[1])
 
-        return op1[1] - op2[1]
+    if op1[0] is FailedValidation:
+        raise op1[1]
 
+    if op2[0] is FailedValidation:
+        raise op2[1]
 
-class NumericMultiplicationOp:
-    keyword = '*'
-    structure = r'\s*([0-9a-zA-Z._\-]+)\s*[*]\s*([\d0-9a-zA-Z._]+)\s*?'
-    power = 2
+    if _types:
+        if not any(type_of_variable(op1[1])[0] is i for i in _types):
+            raise Error.WrongOperationArgumentTypeRaiser(op, groups[0], _type_in_words)
 
-    @staticmethod
-    def perform(command):
-        match = re.findall(NumericMultiplicationOp.structure, command)
+        if not any(type_of_variable(op2[1])[0] is i for i in _types):
+            raise Error.WrongOperationArgumentTypeRaiser(op, groups[0], _type_in_words)
+    else:
+        if check_for_type and type_of_variable(op1[1])[0] is not _type:
+            raise Error.WrongOperationArgumentTypeRaiser(op, groups[0], _type_in_words or _type.keyword)
 
-        if len(match) == 0:
-            raise Error.BadSyntaxRaiser(command, '<operator1> * <operator2>')
+        if check_for_type and type_of_variable(op2[1])[0] is not _type:
+            raise Error.WrongOperationArgumentTypeRaiser(op, groups[1], _type_in_words or _type.keyword)
 
-        match = match[0]
-        op1 = type_of_variable(match[0])
-        op2 = type_of_variable(match[1])
+    return f(op1[1], op2[1])
 
-        if len(op1) == 1:
-            raise op1[0]
 
-        if len(op2) == 1:
-            raise op2[0]
+def run_add(groups):
+    return run_dual_arg_op(groups, '+', lambda a, b: a + b, Number)
 
-        if not op1[0] is Number:
-            raise Error.WrongOperationArgumentTypeRaiser('*', op1, 'number')
 
-        if not op2[0] is Number:
-            raise Error.WrongOperationArgumentTypeRaiser('*', op2, 'number')
+def run_subtract(groups):
+    return run_dual_arg_op(groups, '-', lambda a, b: a - b, Number)
 
-        return op1[1] * op2[1]
 
+def run_multiply(groups):
+    return run_dual_arg_op(groups, '*', lambda a, b: a * b, Number)
 
-class NumericDivisionOp:
-    keyword = '/'
-    structure = r'\s*([0-9a-zA-Z._\-]+)\s*[/]\s*([\d0-9a-zA-Z._]+)\s*?'
-    power = 2
 
-    @staticmethod
-    def perform(command):
-        match = re.findall(NumericDivisionOp.structure, command)
+def run_divide(groups):
+    return run_dual_arg_op(groups, '/', lambda a, b: a / b, Number)
 
-        if len(match) == 0:
-            raise Error.BadSyntaxRaiser(command, '<operator1> / <operator2>')
 
-        match = match[0]
-        op1 = type_of_variable(match[0])
-        op2 = type_of_variable(match[1])
+def run_modulo(groups):
+    return run_dual_arg_op(groups, '%', lambda a, b: a % b, Number)
 
-        if len(op1) == 1:
-            raise op1[0]
 
-        if len(op2) == 1:
-            raise op2[0]
+def run_power(groups):
+    return run_dual_arg_op(groups, 'raise to power', lambda a, b: a ** b, Number)
 
-        if not op1[0] is Number:
-            raise Error.WrongOperationArgumentTypeRaiser('/', op1, 'number')
 
-        if not op2[0] is Number:
-            raise Error.WrongOperationArgumentTypeRaiser('/', op2, 'number')
+def run_or(groups):
+    return run_dual_arg_op(groups, 'or', lambda a, b: a or b, Number, 'number / boolean')
 
-        return op1[1] / op2[1]
 
+def run_xor(groups):
+    return run_dual_arg_op(groups, 'xor', lambda a, b: a ^ b, Number, 'number / boolean')
 
-class NumericModuloOp:
-    keyword = '%'
-    structure = r'\s*([0-9a-zA-Z._\-]+)\s*[%]\s*([\d0-9a-zA-Z._]+)\s*?'
-    power = 2
 
-    @staticmethod
-    def perform(command):
-        match = re.findall(NumericModuloOp.structure, command)
+def run_and(groups):
+    return run_dual_arg_op(groups, 'and', lambda a, b: a and b, Number, 'number / boolean')
 
-        if len(match) == 0:
-            raise Error.BadSyntaxRaiser(command, '<operator1> % <operator2>')
 
-        match = match[0]
-        op1 = type_of_variable(match[0])
-        op2 = type_of_variable(match[1])
+def run_not(groups):
+    op = run_command(groups[0])
 
-        if len(op1) == 1:
-            raise op1[0]
+    if op[0] is FailedValidation:
+        raise op[1]
 
-        if len(op2) == 1:
-            raise op2[0]
+    if type_of_variable(op[1])[0] is not Number:
+        raise Error.WrongOperationArgumentTypeRaiser('not', groups[0], 'boolean')
 
-        if not op1[0] is Number:
-            raise Error.WrongOperationArgumentTypeRaiser('%', op1, 'number')
+    return not op[1]
 
-        if not op2[0] is Number:
-            raise Error.WrongOperationArgumentTypeRaiser('%', op2, 'number')
 
-        return op1[1] % op2[1]
+def run_shift_left(groups):
+    return run_dual_arg_op(groups, 'shift left', lambda a, b: a << b, Number, 'number / boolean')
 
 
-class NumericPowerOp:
-    keyword = '**'
-    structure = r'\s*([0-9a-zA-Z._\-]+)\s*[*][*]\s*([\d0-9a-zA-Z._]+)\s*?'
-    power = 3
+def run_shift_right(groups):
+    return run_dual_arg_op(groups, 'shift right', lambda a, b: a >> b, Number, 'number / boolean')
 
-    @staticmethod
-    def perform(command):
-        match = re.findall(NumericPowerOp.structure, command)
 
-        if len(match) == 0:
-            raise Error.BadSyntaxRaiser(command, '<operator1> ** <operator2>')
+def run_equals(groups):
+    return run_dual_arg_op(groups, 'equals', lambda a, b: a == b, Boolean, check_for_type=False)
 
-        match = match[0]
-        op1 = type_of_variable(match[0])
-        op2 = type_of_variable(match[1])
 
-        if len(op1) == 1:
-            raise op1[0]
+def run_different(groups):
+    return run_dual_arg_op(groups, 'different from', lambda a, b: a != b, Boolean, check_for_type=False)
 
-        if len(op2) == 1:
-            raise op2[0]
 
-        if not op1[0] is Number:
-            raise Error.WrongOperationArgumentTypeRaiser('**', op1, 'number')
+def run_greater(groups):
+    return run_dual_arg_op(groups, 'greater than', lambda a, b: a > b, Boolean,
+                           _types=[Number, String, Boolean, Array], _type_in_words='Number / Boolean / String / Array')
 
-        if not op2[0] is Number:
-            raise Error.WrongOperationArgumentTypeRaiser('**', op2, 'number')
 
-        return op1[1] ** op2[1]
+def run_smaller(groups):
+    return run_dual_arg_op(groups, 'smaller than', lambda a, b: a < b, Boolean,
+                           _types=[Number, String, Boolean, Array], _type_in_words='Number / Boolean / String / Array')
 
 
-class NumericAdditionAssignmentOp:
-    keyword = 'add'
-    structure = r'\s*add\s*([0-9a-zA-Z._\-]+)\s+to\s*([\d0-9a-zA-Z._]+)\s*?'
-    power = 0
+def run_greater_equal(groups):
+    return run_dual_arg_op(groups, 'greater or equal', lambda a, b: a >= b, Boolean,
+                           _types=[Number, String, Boolean, Array], _type_in_words='Number / Boolean / String / Array')
 
-    @staticmethod
-    def perform(command):
-        match = re.findall(NumericAdditionAssignmentOp.structure, command)
 
-        if len(match) == 0:
-            raise Error.BadSyntaxRaiser(command, 'add <value> to <var_name>')
-
-        match = match[0]
-        var_name = match[1]
-        var_value = Interpreter.run_single_command(match[0], get_type_of_var=True)
-
-        if not variable_exists(var_name):
-            raise Error.VariableNotFoundRaiser(match[0])
-
-        if var_value[0] is Error.FailedValidation:
-            raise var_value[1][0]
-
-        add_variable(var_name, var_value[1][0], var_value[1][1] + get_variable(var_name)['value'])
-
-
-class NumericSubtractionAssignmentOp:
-    keyword = 'subtract'
-    structure = r'\s*subtract\s*([0-9a-zA-Z._\-]+)\s+from\s*([\d0-9a-zA-Z._]+)\s*?'
-    power = 0
-
-    @staticmethod
-    def perform(command):
-        match = re.findall(NumericSubtractionAssignmentOp.structure, command)
-
-        if len(match) == 0:
-            raise Error.BadSyntaxRaiser(command, 'subtract <value> from <var_name>')
-
-        match = match[0]
-        var_name = match[1]
-        var_value = Interpreter.run_single_command(match[0], get_type_of_var=True)
-
-        if not variable_exists(var_name):
-            raise Error.VariableNotFoundRaiser(match[0])
-
-        if var_value[0] is Error.FailedValidation:
-            raise var_value[1][0]
-
-        add_variable(var_name, var_value[1][0], get_variable(var_name)['value'] - var_value[1][1])
-
-
-class NumericMultiplicationAssignmentOp:
-    keyword = 'multiply'
-    structure = r'\s*multiply\s*([0-9a-zA-Z._\-]+)\s+by\s*([\d0-9a-zA-Z._]+)\s*?'
-    power = 0
-
-    @staticmethod
-    def perform(command):
-        match = re.findall(NumericMultiplicationAssignmentOp.structure, command)
-
-        if len(match) == 0:
-            raise Error.BadSyntaxRaiser(command, 'multiply <var_name> by <value>')
-
-        match = match[0]
-        var_name = match[0]
-        var_value = Interpreter.run_single_command(match[1], get_type_of_var=True)
-
-        if not variable_exists(var_name):
-            raise Error.VariableNotFoundRaiser(match[1])
-
-        if var_value[0] is Error.FailedValidation:
-            raise var_value[1][0]
-
-        add_variable(var_name, var_value[1][0], get_variable(var_name)['value'] * var_value[1][1])
-
-
-class NumericDivisionAssignmentOp:
-    keyword = 'divide'
-    structure = r'\s*divide\s*([0-9a-zA-Z._\-]+)\s+by\s*([\d0-9a-zA-Z._]+)\s*?'
-    power = 0
-
-    @staticmethod
-    def perform(command):
-        match = re.findall(NumericDivisionAssignmentOp.structure, command)
-
-        if len(match) == 0:
-            raise Error.BadSyntaxRaiser(command, 'divide <var_name> by <value>')
-
-        match = match[0]
-        var_name = match[0]
-        var_value = Interpreter.run_single_command(match[1], get_type_of_var=True)
-
-        if not variable_exists(var_name):
-            raise Error.VariableNotFoundRaiser(match[1])
-
-        if var_value[0] is Error.FailedValidation:
-            raise var_value[1][0]
-
-        add_variable(var_name, var_value[1][0], get_variable(var_name)['value'] / var_value[1][1])
-
-
-class NumericPowerAssignmentOp:
-    keyword = 'raise'
-    structure = r'\s*raise\s*([0-9a-zA-Z._\-]+)\s+to power\s*([\d0-9a-zA-Z._]+)\s*?'
-    power = 0
-
-    @staticmethod
-    def perform(command):
-        match = re.findall(NumericPowerAssignmentOp.structure, command)
-
-        if len(match) == 0:
-            raise Error.BadSyntaxRaiser(command, 'raise <var_name> to power <value>')
-
-        match = match[0]
-        var_name = match[0]
-        var_value = Interpreter.run_single_command(match[1], get_type_of_var=True)
-
-        if not variable_exists(var_name):
-            raise Error.VariableNotFoundRaiser(match[1])
-
-        if var_value[0] is Error.FailedValidation:
-            raise var_value[1][0]
-
-        add_variable(var_name, var_value[1][0], get_variable(var_name)['value'] ** var_value[1][1])
-
-
-class NumericModuloAssignmentOp:
-    keyword = 'modulo'
-    structure = r'\s*modulo\s*([0-9a-zA-Z._\-]+)\s+by\s*([\d0-9a-zA-Z._]+)\s*?'
-    power = 0
-
-    @staticmethod
-    def perform(command):
-        match = re.findall(NumericModuloAssignmentOp.structure, command)
-
-        if len(match) == 0:
-            raise Error.BadSyntaxRaiser(command, 'modulo <var_name> by <value>')
-
-        match = match[0]
-        var_name = match[0]
-        var_value = Interpreter.run_single_command(match[1], get_type_of_var=True)
-
-        if not variable_exists(var_name):
-            raise Error.VariableNotFoundRaiser(match[1])
-
-        if var_value[0] is Error.FailedValidation:
-            raise var_value[1][0]
-
-        add_variable(var_name, var_value[1][0], get_variable(var_name)['value'] % var_value[1][1])
-
-
-class BooleanAndOp:
-    keyword = 'and'
-    structure = r'\s*([0-9a-zA-Z._\-]+)\s*and\s*([\d0-9a-zA-Z._]+)\s*?'
-    power = 3
-
-    @staticmethod
-    def perform(command):
-        match = re.findall(BooleanAndOp.structure, command)
-
-        if len(match) == 0:
-            raise Error.BadSyntaxRaiser(command, '<operator1> and <operator2>')
-
-        match = match[0]
-        op1 = type_of_variable(match[0])
-        op2 = type_of_variable(match[1])
-
-        if len(op1) == 1:
-            raise op1[0]
-
-        if len(op2) == 1:
-            raise op2[0]
-
-        if not op1[0] is Boolean:
-            raise Error.WrongOperationArgumentTypeRaiser('and', op1, 'boolean')
-
-        if not op2[0] is Boolean:
-            raise Error.WrongOperationArgumentTypeRaiser('and', op2, 'boolean')
-
-        return op1[1] and op2[1]
-
-
-class BooleanOrOp:
-    keyword = 'or'
-    structure = r'\s*([0-9a-zA-Z._\-]+)\s*or\s*([\d0-9a-zA-Z._]+)\s*?'
-    power = 1
-
-    @staticmethod
-    def perform(command):
-        match = re.findall(BooleanOrOp.structure, command)
-
-        if len(match) == 0:
-            raise Error.BadSyntaxRaiser(command, '<operator1> or <operator2>')
-
-        match = match[0]
-        op1 = type_of_variable(match[0])
-        op2 = type_of_variable(match[1])
-
-        if len(op1) == 1:
-            raise op1[0]
-
-        if len(op2) == 1:
-            raise op2[0]
-
-        if not op1[0] is Boolean:
-            raise Error.WrongOperationArgumentTypeRaiser('or', op1, 'boolean')
-
-        if not op2[0] is Boolean:
-            raise Error.WrongOperationArgumentTypeRaiser('and', op2, 'boolean')
-
-        return op1[1] or op2[1]
-
-
-class BooleanXorOp:
-    keyword = 'xor'
-    structure = r'\s*([0-9a-zA-Z._\-]+)\s*xor\s*([\d0-9a-zA-Z._]+)\s*?'
-    power = 2
-
-    @staticmethod
-    def perform(command):
-        match = re.findall(BooleanXorOp.structure, command)
-
-        if len(match) == 0:
-            raise Error.BadSyntaxRaiser(command, '<operator1> xor <operator2>')
-
-        match = match[0]
-        op1 = type_of_variable(match[0])
-        op2 = type_of_variable(match[1])
-
-        if len(op1) == 1:
-            raise op1[0]
-
-        if len(op2) == 1:
-            raise op2[0]
-
-        if not op1[0] is Boolean:
-            raise Error.WrongOperationArgumentTypeRaiser('xor', op1, 'boolean')
-
-        if not op2[0] is Boolean:
-            raise Error.WrongOperationArgumentTypeRaiser('xor', op2, 'boolean')
-
-        return op1[1] ^ op2[1]
-
-
-class BooleanNotOp:
-    keyword = 'not'
-    structure = r'\s*not\s*([\d0-9a-zA-Z._]+)\s*?'
-    power = 4
-
-    @staticmethod
-    def perform(command):
-        match = re.findall(BooleanNotOp.structure, command)
-
-        if len(match) == 0:
-            raise Error.BadSyntaxRaiser(command, 'not <operator>')
-
-        op = type_of_variable(match[0])
-
-        if len(op) == 1:
-            raise op[0]
-
-        if not op[0] is Boolean:
-            raise Error.WrongOperationArgumentTypeRaiser('not', op, 'boolean')
-
-        return not op[1]
-
-
-class BitwiseAndOp:
-    keyword = '&'
-    structure = r'\s*([0-9a-zA-Z._\-]+)\s*[&]\s*([\d0-9a-zA-Z._]+)\s*?'
-    power = 3
-
-    @staticmethod
-    def perform(command):
-        match = re.findall(BitwiseAndOp.structure, command)
-
-        if len(match) == 0:
-            raise Error.BadSyntaxRaiser(command, '<operator1> & <operator2>')
-
-        match = match[0]
-        op1 = type_of_variable(match[0])
-        op2 = type_of_variable(match[1])
-
-        if len(op1) == 1:
-            raise op1[0]
-
-        if len(op2) == 1:
-            raise op2[0]
-
-        if not op1[0] is Boolean and not op1[0] is Number:
-            raise Error.WrongOperationArgumentTypeRaiser('&', op1, 'number / boolean')
-
-        if not op2[0] is Boolean and not op2[0] is Number:
-            raise Error.WrongOperationArgumentTypeRaiser('&', op2, 'number / boolean')
-
-        return op1[1] & op2[1]
-
-
-class BitwiseOrOp:
-    keyword = '|'
-    structure = r'\s*([0-9a-zA-Z._\-]+)\s*[|]\s*([\d0-9a-zA-Z._]+)\s*?'
-    power = 1
-
-    @staticmethod
-    def perform(command):
-        match = re.findall(BitwiseOrOp.structure, command)
-
-        if len(match) == 0:
-            raise Error.BadSyntaxRaiser(command, '<operator1> | <operator2>')
-
-        match = match[0]
-        op1 = type_of_variable(match[0])
-        op2 = type_of_variable(match[1])
-
-        if len(op1) == 1:
-            raise op1[0]
-
-        if len(op2) == 1:
-            raise op2[0]
-
-        if not op1[0] is Boolean and not op1[0] is Number:
-            raise Error.WrongOperationArgumentTypeRaiser('|', op1, 'number / boolean')
-
-        if not op2[0] is Boolean and not op2[0] is Number:
-            raise Error.WrongOperationArgumentTypeRaiser('|', op2, 'number / boolean')
-
-        return op1[1] | op2[1]
-
-
-class BitwiseXorOp:
-    keyword = '^'
-    structure = r'\s*([0-9a-zA-Z._\-]+)\s*\^\s*([\d0-9a-zA-Z._]+)\s*?'
-    power = 2
-
-    @staticmethod
-    def perform(command):
-        match = re.findall(BitwiseXorOp.structure, command)
-
-        if len(match) == 0:
-            raise Error.BadSyntaxRaiser(command, '<operator1> ^ <operator2>')
-
-        match = match[0]
-        op1 = type_of_variable(match[0])
-        op2 = type_of_variable(match[1])
-
-        if len(op1) == 1:
-            raise op1[0]
-
-        if len(op2) == 1:
-            raise op2[0]
-
-        if not op1[0] is Boolean and not op1[0] is Number:
-            raise Error.WrongOperationArgumentTypeRaiser('^', op1, 'number / boolean')
-
-        if not op2[0] is Boolean and not op2[0] is Number:
-            raise Error.WrongOperationArgumentTypeRaiser('^', op2, 'number / boolean')
-
-        return op1[1] ^ op2[1]
-
-
-class BitwiseRightShiftOp:
-    keyword = '>>'
-    structure = r'\s*([0-9a-zA-Z._\-]+)\s*>>\s*([\d0-9a-zA-Z._]+)\s*?'
-    power = 4
-
-    @staticmethod
-    def perform(command):
-        match = re.findall(BitwiseRightShiftOp.structure, command)
-
-        if len(match) == 0:
-            raise Error.BadSyntaxRaiser(command, '<operator1> >> <operator2>')
-
-        match = match[0]
-        op1 = type_of_variable(match[0])
-        op2 = type_of_variable(match[1])
-
-        if len(op1) == 1:
-            raise op1[0]
-
-        if len(op2) == 1:
-            raise op2[0]
-
-        if not op1[0] is Boolean and not op1[0] is Number:
-            raise Error.WrongOperationArgumentTypeRaiser('>>', op1, 'number / boolean')
-
-        if not op2[0] is Boolean and not op2[0] is Number:
-            raise Error.WrongOperationArgumentTypeRaiser('>>', op2, 'number / boolean')
-
-        return op1[1] >> op2[1]
-
-
-class BitwiseLeftShiftOp:
-    keyword = '<<'
-    structure = r'\s*([0-9a-zA-Z._\-]+)\s*<<\s*([\d0-9a-zA-Z._]+)\s*?'
-    power = 4
-
-    @staticmethod
-    def perform(command):
-        match = re.findall(BitwiseLeftShiftOp.structure, command)
-
-        if len(match) == 0:
-            raise Error.BadSyntaxRaiser(command, '<operator1> << <operator2>')
-
-        match = match[0]
-        op1 = type_of_variable(match[0])
-        op2 = type_of_variable(match[1])
-
-        if len(op1) == 1:
-            raise op1[0]
-
-        if len(op2) == 1:
-            raise op2[0]
-
-        if not op1[0] is Boolean and not op1[0] is Number:
-            raise Error.WrongOperationArgumentTypeRaiser('<<', op1, 'number / boolean')
-
-        if not op2[0] is Boolean and not op2[0] is Number:
-            raise Error.WrongOperationArgumentTypeRaiser('<<', op2, 'number / boolean')
-
-        return op1[1] << op2[1]
-
-
-class BitwiseNotOp:
-    keyword = '!'
-    structure = r'\s*[!]\s*([\d0-9a-zA-Z._]+)\s*?'
-    power = 5
-
-    @staticmethod
-    def perform(command):
-        match = re.findall(BitwiseNotOp.structure, command)
-
-        if len(match) == 0:
-            raise Error.BadSyntaxRaiser(command, '! <operator>')
-
-        op = type_of_variable(match[0])
-
-        if len(op) == 1:
-            raise op[0]
-
-        if not op[0] is Boolean and not op[0] is Number:
-            raise Error.WrongOperationArgumentTypeRaiser('!', op, 'boolean / number')
-
-        return ~ op[1]
+def run_smaller_equal(groups):
+    return run_dual_arg_op(groups, 'smaller or equal', lambda a, b: a <= b, Boolean,
+                           _types=[Number, String, Boolean, Array], _type_in_words='Number / Boolean / String / Array')
 
 
 OPERATIONS = {
-    'print': PrintOp,
-    'input': InputOp,
-    '=': VariableAssignmentOp,
-    'del': VariableDeletionOp,
-    '+': NumericAdditionOp,
-    '-': NumericSubtractionOp,
-    '*': NumericMultiplicationOp,
-    '/': NumericDivisionOp,
-    '%': NumericModuloOp,
-    '**': NumericPowerOp,
-    'and': BooleanAndOp,
-    'or': BooleanOrOp,
-    'xor': BooleanXorOp,
-    'not': BooleanNotOp,
-    '&': BitwiseAndOp,
-    '|': BitwiseOrOp,
-    '^': BitwiseXorOp,
-    '>>': BitwiseRightShiftOp,
-    '<<': BitwiseLeftShiftOp,
-    '!': BitwiseNotOp,
-    'add': NumericAdditionAssignmentOp,
-    'subtract': NumericSubtractionAssignmentOp,
-    'multiply': NumericMultiplicationAssignmentOp,
-    'divide': NumericDivisionAssignmentOp,
-    'raise': NumericPowerAssignmentOp,
-    'modulo': NumericModuloAssignmentOp
+    'print': {
+        'structure': r'print\s+(\([^\)]*\)|\S*)(?:\s+end with\s+(\S.*))?',
+        'function': run_print,
+        'correct_form': 'print <output> (end with <end>)',
+        'power': -1,
+        'args_expected': lambda i: 2 >= i >= 1
+    },
+    'input': {
+        'structure': r'input\s*(?:message\s+(\S.*))?',
+        'function': run_input,
+        'correct_form': 'input (message <message>)',
+        'power': 10,
+        'args_expected': lambda i: 1 >= i >= 0
+    },
+    'typeof': {
+        'structure': r'typeof\s+(\S.*)',
+        'function': run_typeof,
+        'correct_form': 'typeof <var>',
+        'power': 0,
+        'args_expected': lambda i: i == 1
+    },
+    'set': {
+        'structure': r'set\s+(\S.*)\s+to\s+(\S.*)',
+        'function': run_set,
+        'correct_form': 'set <var_name> to <value>',
+        'power': 0,
+        'args_expected': lambda i: i == 2
+    },
+    'del': {
+        'structure': r'del\s+(\S.*)',
+        'function': run_del,
+        'correct_form': 'del <var_name>',
+        'power': 10,
+        'args_expected': lambda i: i == 1
+    },
+    '+': {
+        'structure': r'(\S+)\s+[+]\s+([^\s+]+)',
+        'function': run_add,
+        'correct_form': '<operator1> + <operator2>',
+        'power': 1,
+        'args_expected': lambda i: i == 2
+    },
+    '- ': {
+        'structure': r'(\S+)\s+[-]\s+([^\s-]+)',
+        'function': run_subtract,
+        'correct_form': '<operator1> - <operator2>',
+        'power': 1,
+        'args_expected': lambda i: i == 2
+    },
+    '* ': {
+        'structure': r'(\S+)\s+[*]\s+([^\s*]+)',
+        'function': run_multiply,
+        'correct_form': '<operator1> * <operator2>',
+        'power': 2,
+        'args_expected': lambda i: i == 2
+    },
+    '/': {
+        'structure': r'(\S+)\s+[/]\s+([^\s/]+)',
+        'function': run_divide,
+        'correct_form': '<operator1> / <operator2>',
+        'power': 2,
+        'args_expected': lambda i: i == 2
+    },
+    '%': {
+        'structure': r'(\S+)\s+[%]\s+([^\s%]+)',
+        'function': run_modulo,
+        'correct_form': '<operator1> % <operator2>',
+        'power': 2,
+        'args_expected': lambda i: i == 2
+    },
+    'raise': {
+        'structure': r'raise\s+(\S+)\s+to\s+power\s+(\S+)',
+        'function': run_power,
+        'correct_form': 'raise <operator> to power <power>',
+        'power': 3,
+        'args_expected': lambda i: i == 2
+    },
+    'or': {
+        'structure': r'(\S+)\s+or\s+(\S+)',
+        'function': run_or,
+        'correct_form': '<operator1> or <operator2>',
+        'power': 1,
+        'args_expected': lambda i: i == 2
+    },
+    'xor': {
+        'structure': r'(\S+)\s+xor\s+(\S+)',
+        'function': run_xor,
+        'correct_form': '<operator1> xor <operator2>',
+        'power': 2,
+        'args_expected': lambda i: i == 2
+    },
+    'and': {
+        'structure': r'(\S+)\s+and\s+(\S+)',
+        'function': run_and,
+        'correct_form': '<operator1> and <operator2>',
+        'power': 3,
+        'args_expected': lambda i: i == 2
+    },
+    'not': {
+        'structure': r'not\s+(\S+)',
+        'function': run_not,
+        'correct_form': 'not <operator>',
+        'power': 4,
+        'args_expected': lambda i: i == 1
+    },
+    'shift left': {
+        'structure': r'(\S+)\s+shift left\s+(\S+)',
+        'function': run_shift_left,
+        'correct_form': '<operator1> shift left <operator2>',
+        'power': 3.5,
+        'args_expected': lambda i: i == 2
+    },
+    'shift right': {
+        'structure': r'(\S+)\s+shift right\s+(\S+)',
+        'function': run_shift_right,
+        'correct_form': '<operator1> shift right <operator2>',
+        'power': 3.5,
+        'args_expected': lambda i: i == 2
+    },
+    'equals': {
+        'structure': r'(\S+)\s+equals\s+(\S+)',
+        'function': run_equals,
+        'correct_form': '<operator1> equals <operator2>',
+        'power': 0,
+        'args_expected': lambda i: i == 2
+    },
+    'different from': {
+        'structure': r'(\S+)\s+different from\s+(\S+)',
+        'function': run_different,
+        'correct_form': '<operator1> different from <operator2>',
+        'power': 0,
+        'args_expected': lambda i: i == 2
+    },
+    'greater than': {
+        'structure': r'(\S+)\s+greater than\s+(\S+)',
+        'function': run_greater,
+        'correct_form': '<operator1> greater than <operator2>',
+        'power': 0,
+        'args_expected': lambda i: i == 2
+    },
+    'smaller than': {
+        'structure': r'(\S+)\s+smaller than\s+(\S+)',
+        'function': run_smaller,
+        'correct_form': '<operator1> smaller than <operator2>',
+        'power': 0,
+        'args_expected': lambda i: i == 2
+    },
+    'greater or equal than': {
+        'structure': r'(\S+)\s+greater or equal than\s+(\S+)',
+        'function': run_greater_equal,
+        'correct_form': '<operator1> greater or equal than <operator2>',
+        'power': 0,
+        'args_expected': lambda i: i == 2
+    },
+    'smaller or equal than': {
+        'structure': r'(\S+)\s+smaller or equal than\s+(\S+)',
+        'function': run_smaller_equal,
+        'correct_form': '<operator1> smaller or equal than <operator2>',
+        'power': 0,
+        'args_expected': lambda i: i == 2
+    }
 }
-
-# ** > *, /, % > +, -
-# not > and > xor > or
-# ! > shift left, shift right > & > ^ > |

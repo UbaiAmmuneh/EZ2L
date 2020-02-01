@@ -84,12 +84,8 @@ class BadVariableName(Error):
     pass
 
 
-def BadVariableNameRaiser(name, letter_index):
-    if letter_index == 0:
-        message = 'Variable name must start with a letter or underscore, got -%s- %s.' % (name[0], name[1:])
-    else:
-        message = 'Variable name may contain letters, numbers and underscore, got %s -%s- %s' % \
-                  (name[:letter_index], name[letter_index], name[letter_index+1:])
+def BadVariableNameRaiser(name):
+    message = 'Variable name must start with a letter or underscore, got %s' % name
     return BadVariableName(message)
 
 

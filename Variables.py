@@ -1,3 +1,5 @@
+import re
+
 import Error
 
 
@@ -5,24 +7,27 @@ def load_variables():
     pass
 
 
-def add_variable(var_name, var_type, var_value):
-    VARIABLES[var_name] = {'class_name': var_type, 'value': var_value}
-
-
-def delete_variable(var_name):
-    if var_name not in VARIABLES:
-        raise Error.VariableNotFoundRaiser(var_name)
-
-    del VARIABLES[var_name]
-
-
 def variable_exists(var_name):
     load_variables()
     return var_name.__hash__ is not None and var_name in VARIABLES
 
 
+def add_variable(var_name, var_type, var_value):
+    VARIABLES[var_name] = {'class_name': var_type, 'value': var_value}
+
+
 def get_variable(var_name):
-    return VARIABLES.get(var_name, None)
+    if variable_exists(var_name):
+        return VARIABLES.get(var_name, None)
+
+    return Error.VariableNotFoundRaiser(var_name)
+
+
+def delete_variable(var_name):
+    if variable_exists(var_name):
+        del VARIABLES[var_name]
+
+    return Error.VariableNotFoundRaiser(var_name)
 
 
 def type_of_variable(var, check_variables=True):
@@ -54,13 +59,9 @@ class Variable:
 
     @staticmethod
     def check_name(name):
-        if name[0].isalpha() or name[0] == '_':
-            for i in name[1:]:
-                if not i.isalpha() and i != '_' and Number.validate(i)[0] is Error.FailedValidation:
-                    return Error.FailedValidation, Error.BadVariableNameRaiser(name, name.index(i))
+        if re.match(r'[a-zA-Z_]\w*', name):
             return Error.SucceededValidation, name
-        else:
-            return Error.FailedValidation, Error.BadVariableNameRaiser(name, 0)
+        return Error.FailedValidation, Error.BadVariableNameRaiser(name)
 
     @staticmethod
     def find_parens(s, open_par, close_par):
@@ -86,17 +87,21 @@ class Variable:
 
 
 class Null(Variable):
+    keyword = 'Null'
+
     def __init__(self, value):
         super().__init__('null', value)
 
     @staticmethod
     def validate(value):
-        if value == 'null':
+        if value == 'null' or value == 'None':
             return Error.SucceededValidation, None
         return Error.FailedValidation, Error.IdentifierDoesntMatchValueRaiser('null', value)
 
 
 class Boolean(Variable):
+    keyword = 'Boolean'
+
     def __int__(self, value):
         super().__init__('boolean', value)
 
@@ -109,6 +114,8 @@ class Boolean(Variable):
 
 
 class Number(Variable):
+    keyword = 'Number'
+
     def __int__(self, value):
         super().__init__('number', value)
 
@@ -123,6 +130,8 @@ class Number(Variable):
 
 
 class String(Variable):
+    keyword = 'String'
+
     def __int__(self, value):
         super().__init__('string', value)
 
@@ -138,6 +147,8 @@ class String(Variable):
 
 
 class Array(Variable):
+    keyword = 'Array'
+
     def __int__(self, value):
         super().__init__('array', value)
 
@@ -177,7 +188,7 @@ class Array(Variable):
                 except IndexError:
                     return Error.FailedValidation, Error.InvalidKeyValuePairStructureRaiser(value)
 
-                calculated = Array.validate(value[i:end+1])
+                calculated = Array.validate(value[i:end + 1])
                 if calculated[0] is Error.FailedValidation:
                     return calculated
                 final_array.append(calculated[1])
@@ -191,7 +202,7 @@ class Array(Variable):
                 except IndexError:
                     return Error.FailedValidation, Error.InvalidKeyValuePairStructureRaiser(value)
 
-                calculated = Map.validate(value[i:end+1])
+                calculated = Map.validate(value[i:end + 1])
                 if calculated[0] is Error.FailedValidation:
                     return calculated
                 final_array.append(calculated[1])
@@ -213,6 +224,8 @@ class Array(Variable):
 
 
 class Map(Variable):
+    keyword = 'Map'
+
     def __int__(self, value):
         super().__init__('mpa', value)
 
@@ -222,7 +235,7 @@ class Map(Variable):
 
     @staticmethod
     def divide_to_pairs(value):
-        from Interpreter import Interpreter
+        from Operations import run_command
 
         if value == '':
             return []
@@ -233,7 +246,7 @@ class Map(Variable):
         if '(' in value and ')' in value and not any(i in value for i in '{}[]'):
             start = value.index('(')
             end = len(value) - 1 - [value[i] for i in range(len(value) - 1, -1, -1)].index(')')
-            result = Interpreter.run_single_command(value[start + 1:end])
+            result = run_command(value[start + 1:end])
             if result[0] is Error.SucceededValidation:
                 return Map.divide_to_pairs(value[:start] + result[1] + value[end + 1:])
             raise result[1]
@@ -241,7 +254,7 @@ class Map(Variable):
         if '[' in value and ']' in value and not any(i in value for i in '{}') and value.count:
             value = value.replace(' ', '', value.count(' '))
             start, end = Map.find_parens(value, '[', ']')[0]
-            arr = Array.validate('[' + value[start+1:end] + ']')
+            arr = Array.validate('[' + value[start + 1:end] + ']')
             if arr[0] is Error.SucceededValidation:
                 last_comma_before = value[:start].rfind(',')
                 first_comma_after = value.find(',', end)
@@ -253,17 +266,17 @@ class Map(Variable):
                     else:
                         raise Error.EmptyValueRaiser(value, 'map-value')
 
-                before = Map.divide_to_pairs(value[:last_comma_before+1][:-1])
-                after = Map.divide_to_pairs(value[first_comma_after+1:]) if first_comma_after > -1 else []
+                before = Map.divide_to_pairs(value[:last_comma_before + 1][:-1])
+                after = Map.divide_to_pairs(value[first_comma_after + 1:]) if first_comma_after > -1 else []
 
-                key = value[last_comma_before+1:divider]
-                v = value[divider+1:first_comma_after] + (value[first_comma_after] if first_comma_after == -1 else '')
+                key = value[last_comma_before + 1:divider]
+                v = value[divider + 1:first_comma_after] + (value[first_comma_after] if first_comma_after == -1 else '')
 
-                if value[divider+1] == '[' and \
-                        (value[first_comma_after-1] == ']' or (first_comma_after == -1 and value[-1] != ']')):
+                if value[divider + 1] == '[' and \
+                        (value[first_comma_after - 1] == ']' or (first_comma_after == -1 and value[-1] != ']')):
                     v = [Error.SucceededValidation, v]
                 else:
-                    v = Interpreter.run_single_command(v)
+                    v = run_command(v)
                     if v[0] is Error.FailedValidation:
                         raise v[1]
 
@@ -329,7 +342,7 @@ class Map(Variable):
                 except IndexError:
                     return Error.FailedValidation, Error.InvalidKeyValuePairStructureRaiser(value)
 
-                calculated = Array.validate(value[i:end+1])
+                calculated = Array.validate(value[i:end + 1])
                 if calculated[0] is Error.FailedValidation:
                     return calculated
 
@@ -355,7 +368,7 @@ class Map(Variable):
                 except IndexError:
                     return Error.FailedValidation, Error.InvalidKeyValuePairStructureRaiser(value)
 
-                calculated = Map.validate(value[i:end+1])
+                calculated = Map.validate(value[i:end + 1])
                 if calculated[0] is Error.FailedValidation:
                     return calculated
 
@@ -548,8 +561,8 @@ class BinarySearchTree:
 
     def get_all_nodes(self):
         return self.get_left().get_all_nodes() \
-                if self.has_left() else [] + [self.get_value()] + \
-                self.get_right().get_all_nodes() if self.has_right() else []
+            if self.has_left() \
+            else [] + [self.get_value()] + self.get_right().get_all_nodes() if self.has_right() else []
 
     def _balance(self, nodes, start, end):
         if start > end:
@@ -582,8 +595,8 @@ class BinarySearchTree:
         if level == 0:
             return [str(self.get_value())]
 
-        return (self.get_left().values_in_level(level-1) if self.has_left() else [''] * (2 ** (level - 1))) + \
-               (self.get_right().values_in_level(level-1) if self.has_right() else [''] * (2 ** (level - 1)))
+        return (self.get_left().values_in_level(level - 1) if self.has_left() else [''] * (2 ** (level - 1))) + \
+               (self.get_right().values_in_level(level - 1) if self.has_right() else [''] * (2 ** (level - 1)))
 
     def display(self):
         lines = []
@@ -610,10 +623,10 @@ class BinarySearchTree:
                 if i < len(values) // 2:
                     cond1 = len(values[i * 2].strip()) > 0
                     cond2 = len(values[i * 2 + 1].strip()) > 0
-                    left = (left_corner + _ * spacer1 if cond1 else ' ' * (node_width + node_width*spacer1))
-                    right = (_ * spacer1 + right_corner if cond2 else ' ' * (node_width + node_width*spacer1))
+                    left = (left_corner + _ * spacer1 if cond1 else ' ' * (node_width + node_width * spacer1))
+                    right = (_ * spacer1 + right_corner if cond2 else ' ' * (node_width + node_width * spacer1))
                     middle = (('_' if cond1 else ' ') * ((node_width - 1) // 2) +
-                              ('|' if(cond1 or cond2) else ' ') +
+                              ('|' if (cond1 or cond2) else ' ') +
                               ('_' if cond2 else ' ') * ((node_width - 1) // 2))
                     ___ = left + middle + right
                     line1 += (space1 + ___ + space1 + ' ' * node_width)
@@ -750,7 +763,7 @@ class Stack:
             bottom_line = top_line.replace('_', '͞')
             lines.append(top_line)
             for i in range(len(self.values)):
-                value = self.values[-i-1]
+                value = self.values[-i - 1]
                 line = ('| {:^%s.%s} |' % (max_node_length, max_node_length)).format(str(value))
                 lines.append(line + (' <- Top' if i == 0 else ''))
             lines.append(bottom_line)
@@ -789,10 +802,12 @@ VARIABLE_TYPES = {
     'map': Map,
 }
 
+# from Operations import OPERATIONS
+
 RESERVED_WORDS = [
-    'boolean', 'number', 'string', 'array', 'map', 'print',
-    # 'delete_var', 'typeof', 'input', 'if', 'else', 'while', 'for', 'from', 'to', 'skip', 'in', 'function', 'return',
-    # 'takes', 'as',
-]
+                     'boolean', 'number', 'string', 'array', 'map', 'print',
+                     # 'typeof', 'if', 'else', 'while', 'for', 'from', 'to', 'skip', 'in', 'function', 'return',
+                     # 'takes', 'as',
+                 ]  # + list(OPERATIONS.keys())
 
 VARIABLES = {'x': {'class_name': Number, 'value': 1}}
