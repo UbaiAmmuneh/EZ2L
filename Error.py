@@ -150,3 +150,12 @@ class WrongOperationArgumentCount(Error):
 def WrongOperationArgumentCountRaiser(op, required_args_count, command):
     message = 'Operation %s requires %s arguments, got %s' % (op, required_args_count, command)
     return WrongOperationArgumentCount(message)
+
+
+class MissingFor(Error):
+    pass
+
+
+def MissingForRaiser(what, where):
+    message = 'Missing %s for %s' % (what, where)
+    raise MissingFor(message)

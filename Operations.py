@@ -11,11 +11,12 @@ def run_command(command, previous_ops=None):
         return SucceededValidation, command
 
     command_is_var = type_of_variable(command)
-
     if len(command_is_var) > 1:
         return SucceededValidation, command_is_var[1]
 
-    if '(' in command:
+    _c = re.compile(r'([\'"].*[\'"])').sub(r"", command)
+
+    if '(' in _c:
         start, end = Variable.find_parens(command, '(', ')')[-1]
         inner = run_command(command[start + 1: end])
 
@@ -24,7 +25,7 @@ def run_command(command, previous_ops=None):
 
         return run_command(command[:start] + convert_to_string(inner[1]) + command[end + 1:])
 
-    ops = sorted(sorted([op for op in OPERATIONS if op in command], key=lambda op: -OPERATIONS[op]['power']),
+    ops = sorted(sorted([op for op in OPERATIONS if op in _c], key=lambda op: -OPERATIONS[op]['power']),
                  key=lambda op: -len(re.findall(OPERATIONS[op]['structure'], command)))
 
     if len(ops) == 0:
@@ -66,29 +67,177 @@ def run_command(command, previous_ops=None):
     return run_command(updated_command, ops[1:])
 
 
-def run_print(groups):
-    output = run_command(groups[0])
+def run_file(file_name='main.ezdata'):
+    f = open(file_name + ('.ezdata' if file_name[-7:] != '.ezdata' else ''), 'r')
+    lines = "".join(f.readlines())
+    f.close()
 
-    if output[0] is FailedValidation:
-        raise output[1]
+    while '//' in lines:
+        s = re.search(r'//[^\n]*', lines)
+        lines = lines.replace(lines[s.start():s.end()], '')
 
-    if output[1] is not None:
-        _ = '\n'
-        if len(groups) == 2:
-            end = run_command(groups[1])
+    while '/*' in lines:
+        s = re.search(r'/\*.*?\*/', lines, re.DOTALL)
+        lines = lines.replace(lines[s.start():s.end()], '')
 
-            if end[0] is FailedValidation:
-                raise end[1]
+    lines = [i.strip() for i in lines.split('\n') if i != '']
 
-            type_of_end = type_of_variable(end[1])
+    run_lines(lines)
 
-            if type_of_end[0] is String:
-                _ = type_of_end[1]
 
+def find_else_end(lines, key='if'):
+    i = 1
+    _ = 1
+    _else = -1
+    _endif = -1
+    problem = -1
+
+    while i < len(lines):
+        if re.match(r'\s*' + key + r'.*', lines[i]):
+            _ += 1
+            problem = i
+        elif re.match(r'\s*end\s+' + key + r'\s*', lines[i]):
+            if _ <= 0:
+                raise Error.MissingForRaiser('an %s statement' % key,
+                                             'end %s statement inside of %s scope' % (key, lines[0]))
+            if _ > 1:
+                _ -= 1
+                problem = -1
             else:
-                raise Error.WrongOperationArgumentTypeRaiser('print <output> end with <end>', groups[1], 'string')
+                _endif = i
+                break
+        elif re.match(r'\s*else\s*', lines[i]) and _ == 1 and _else < 0:
+            _else = i
 
-        print(output[1], end=_)
+        i += 1
+
+    if i == len(lines):
+        raise Error.MissingForRaiser('<end %s>' % key, lines[problem])
+
+    return _else, _endif
+
+
+def run_lines(lines):
+    i = 0
+    while i < len(lines):
+        if len(lines[i].strip()) == 0:
+            pass
+        elif re.match(r'\s*if.*', lines[i]):
+            _else, _end = find_else_end(lines[i:])
+            _else += (i if _else > -1 else 0)
+            _end += i
+            condition = run_command(re.findall(r'if\s+(.*)', lines[i])[0])
+
+            if condition[0] is FailedValidation:
+                raise condition[1]
+
+            if type_of_variable(condition[1])[1]:
+                run_lines(lines[i + 1: (_else if _else > -1 else _end)])
+            elif _else > -1:
+                run_lines(lines[_else + 1: _end])
+
+            i = _end
+        elif re.match(r'\s*while.*', lines[i]):
+            _end = find_else_end(lines[i:], key='while')[1] + i
+            condition_text = re.findall(r'while\s+(.*)', lines[i])[0]
+            condition = run_command(condition_text)
+
+            if condition[0] is FailedValidation:
+                raise condition[1]
+
+            while type_of_variable(condition[1])[1]:
+                run_lines(lines[i + 1: _end])
+                condition = run_command(condition_text)
+
+                if condition[0] is FailedValidation:
+                    raise condition[1]
+
+            i = _end
+        elif re.match(r'\s*for\s+(.+?)\s+from\s+(.+?)\s+to\s+(.+)\s*', lines[i]):
+            _end_for = find_else_end(lines[i:], key='for')[1] + i
+            _ = re.findall(r'\s*for\s+(.+?)\s+from\s+(.+?)\s+to\s+(.+)\s*', lines[i])
+
+            if len(_) == 0:
+                raise
+
+            counter, start, end = _[0]
+            if re.match(r'(.+?)\s+jump\s+(.+)', end):
+                end, jump = re.findall(r'(.+?)\s+jump\s+(.+)', end)[0]
+            else:
+                jump = 1
+
+            if jump == '':
+                jump = 1
+
+            _start, _end, _jump = type_of_variable(start), type_of_variable(end), type_of_variable(jump)
+
+            if _start[0] is not Number:
+                raise Error.WrongOperationArgumentTypeRaiser('for-from-to', start, 'number')
+
+            if _end[0] is not Number:
+                raise Error.WrongOperationArgumentTypeRaiser('for-from-to', end, 'number')
+
+            if _jump[0] is not Number:
+                raise Error.WrongOperationArgumentTypeRaiser('for-from-to', jump, 'number')
+
+            for j in range(_start[1], _end[1], _jump[1]):
+                run_set([counter, str(j)])
+                run_lines(lines[i + 1: _end_for])
+
+            delete_variable(counter)
+
+            i = _end_for
+        elif re.match(r'\s*for\s+(.+?)\s+in\s+(.+?)\s*', lines[i]):
+            _end_for = find_else_end(lines[i:], key='for')[1] + i
+            _ = re.findall(r'\s*for\s+(.+?)\s+in\s+(.+?)\s*', lines[i])
+
+            if len(_) == 0:
+                raise
+
+            counter, where = _[0]
+            print(counter, where)
+            _where = type_of_variable(where)
+            print(_where)
+
+            if _where[0] not in [Array, Map]:
+                raise Error.WrongOperationArgumentTypeRaiser('for-in', where, 'collection (Array / Map)')
+
+            for j in _where:
+                run_set([counter, str(j)])
+                run_lines(lines[i + 1: _end_for])
+
+            delete_variable(counter)
+
+            i = _end_for
+        else:
+            run_command(lines[i])
+
+        i += 1
+
+
+def run_print(groups):
+    output = re.split(r'\s+end\s+with\s+', groups[0])
+
+    text = run_command(output[0])
+    end = '\n'
+
+    if text[0] is FailedValidation:
+        raise text[1]
+
+    if len(output) == 2:
+        end = run_command(output[1])
+
+        if end[0] is FailedValidation:
+            raise end[1]
+
+        type_of_end = type_of_variable('"%s"' % end[1])
+
+        if type_of_end[0] is String:
+            end = type_of_end[1]
+        else:
+            raise Error.WrongOperationArgumentTypeRaiser('print <output> end with <end>', output[1], 'string')
+
+    print(text[1], end=end)
 
 
 def run_input(groups):
@@ -134,16 +283,12 @@ def run_set(groups):
     if var_value[0] is FailedValidation:
         raise var_value[1]
 
-    var_type = type_of_variable(var_name[1])
+    var_type = type_of_variable(str(var_value[1]))
 
     if len(var_type) == 1:
         raise var_type[0]
 
     add_variable(var_name[1], var_type, var_value[1])
-
-
-def run_del(groups):
-    delete_variable(groups[0])
 
 
 def run_dual_arg_op(groups, op, f, _type, _type_in_words=None, check_for_type=True, _types=None):
@@ -172,42 +317,6 @@ def run_dual_arg_op(groups, op, f, _type, _type_in_words=None, check_for_type=Tr
     return f(op1[1], op2[1])
 
 
-def run_add(groups):
-    return run_dual_arg_op(groups, '+', lambda a, b: a + b, Number)
-
-
-def run_subtract(groups):
-    return run_dual_arg_op(groups, '-', lambda a, b: a - b, Number)
-
-
-def run_multiply(groups):
-    return run_dual_arg_op(groups, '*', lambda a, b: a * b, Number)
-
-
-def run_divide(groups):
-    return run_dual_arg_op(groups, '/', lambda a, b: a / b, Number)
-
-
-def run_modulo(groups):
-    return run_dual_arg_op(groups, '%', lambda a, b: a % b, Number)
-
-
-def run_power(groups):
-    return run_dual_arg_op(groups, 'raise to power', lambda a, b: a ** b, Number)
-
-
-def run_or(groups):
-    return run_dual_arg_op(groups, 'or', lambda a, b: a or b, Number, 'number / boolean')
-
-
-def run_xor(groups):
-    return run_dual_arg_op(groups, 'xor', lambda a, b: a ^ b, Number, 'number / boolean')
-
-
-def run_and(groups):
-    return run_dual_arg_op(groups, 'and', lambda a, b: a and b, Number, 'number / boolean')
-
-
 def run_not(groups):
     op = run_command(groups[0])
 
@@ -220,45 +329,21 @@ def run_not(groups):
     return not op[1]
 
 
-def run_shift_left(groups):
-    return run_dual_arg_op(groups, 'shift left', lambda a, b: a << b, Number, 'number / boolean')
+def run_sqrt(groups):
+    op = run_command(groups[0])
 
+    if op[0] is FailedValidation:
+        raise op[1]
 
-def run_shift_right(groups):
-    return run_dual_arg_op(groups, 'shift right', lambda a, b: a >> b, Number, 'number / boolean')
+    if type_of_variable(op[1])[0] is not Number:
+        raise Error.WrongOperationArgumentTypeRaiser('not', groups[0], 'number')
 
-
-def run_equals(groups):
-    return run_dual_arg_op(groups, 'equals', lambda a, b: a == b, Boolean, check_for_type=False)
-
-
-def run_different(groups):
-    return run_dual_arg_op(groups, 'different from', lambda a, b: a != b, Boolean, check_for_type=False)
-
-
-def run_greater(groups):
-    return run_dual_arg_op(groups, 'greater than', lambda a, b: a > b, Boolean,
-                           _types=[Number, String, Boolean, Array], _type_in_words='Number / Boolean / String / Array')
-
-
-def run_smaller(groups):
-    return run_dual_arg_op(groups, 'smaller than', lambda a, b: a < b, Boolean,
-                           _types=[Number, String, Boolean, Array], _type_in_words='Number / Boolean / String / Array')
-
-
-def run_greater_equal(groups):
-    return run_dual_arg_op(groups, 'greater or equal', lambda a, b: a >= b, Boolean,
-                           _types=[Number, String, Boolean, Array], _type_in_words='Number / Boolean / String / Array')
-
-
-def run_smaller_equal(groups):
-    return run_dual_arg_op(groups, 'smaller or equal', lambda a, b: a <= b, Boolean,
-                           _types=[Number, String, Boolean, Array], _type_in_words='Number / Boolean / String / Array')
+    return op[1] ** 0.5
 
 
 OPERATIONS = {
     'print': {
-        'structure': r'print\s+(\([^\)]*\)|\S*)(?:\s+end with\s+(\S.*))?',
+        'structure': r'print\s+(\([^\)]*\)|.*)',
         'function': run_print,
         'correct_form': 'print <output> (end with <end>)',
         'power': -1,
@@ -287,135 +372,158 @@ OPERATIONS = {
     },
     'del': {
         'structure': r'del\s+(\S.*)',
-        'function': run_del,
+        'function': lambda groups: delete_variable(groups[0]),
         'correct_form': 'del <var_name>',
-        'power': 10,
+        'power': 0,
         'args_expected': lambda i: i == 1
     },
     '+': {
         'structure': r'(\S+)\s+[+]\s+([^\s+]+)',
-        'function': run_add,
+        'function': lambda groups: run_dual_arg_op(groups, '+', lambda a, b: a + b, Number),
         'correct_form': '<operator1> + <operator2>',
-        'power': 1,
+        'power': 6,
         'args_expected': lambda i: i == 2
     },
     '- ': {
         'structure': r'(\S+)\s+[-]\s+([^\s-]+)',
-        'function': run_subtract,
+        'function': lambda groups: run_dual_arg_op(groups, '-', lambda a, b: a - b, Number),
         'correct_form': '<operator1> - <operator2>',
-        'power': 1,
+        'power': 6,
         'args_expected': lambda i: i == 2
     },
     '* ': {
         'structure': r'(\S+)\s+[*]\s+([^\s*]+)',
-        'function': run_multiply,
+        'function': lambda groups: run_dual_arg_op(groups, '*', lambda a, b: a * b, Number),
         'correct_form': '<operator1> * <operator2>',
-        'power': 2,
+        'power': 7,
         'args_expected': lambda i: i == 2
     },
     '/': {
         'structure': r'(\S+)\s+[/]\s+([^\s/]+)',
-        'function': run_divide,
+        'function': lambda groups: run_dual_arg_op(groups, '/', lambda a, b: a / b, Number),
         'correct_form': '<operator1> / <operator2>',
-        'power': 2,
+        'power': 7,
         'args_expected': lambda i: i == 2
     },
     '%': {
         'structure': r'(\S+)\s+[%]\s+([^\s%]+)',
-        'function': run_modulo,
+        'function': lambda groups: run_dual_arg_op(groups, '%', lambda a, b: a % b, Number),
         'correct_form': '<operator1> % <operator2>',
-        'power': 2,
+        'power': 7,
         'args_expected': lambda i: i == 2
     },
     'raise': {
         'structure': r'raise\s+(\S+)\s+to\s+power\s+(\S+)',
-        'function': run_power,
+        'function': lambda groups: run_dual_arg_op(groups, 'raise to power', lambda a, b: a ** b, Number),
         'correct_form': 'raise <operator> to power <power>',
-        'power': 3,
+        'power': 8,
         'args_expected': lambda i: i == 2
+    },
+    'sqrt': {
+        'structure': r'sqrt\s+of\s+(\S+)',
+        'function': run_sqrt,
+        'correct_form': 'sqrt of <operator>',
+        'power': 8,
+        'args_expected': lambda i: i == 1
     },
     'or': {
         'structure': r'(\S+)\s+or\s+(\S+)',
-        'function': run_or,
+        'function': lambda groups: run_dual_arg_op(groups, 'or', lambda a, b: a or b, Number, 'number / boolean'),
         'correct_form': '<operator1> or <operator2>',
         'power': 1,
         'args_expected': lambda i: i == 2
     },
     'xor': {
         'structure': r'(\S+)\s+xor\s+(\S+)',
-        'function': run_xor,
+        'function': lambda groups: run_dual_arg_op(groups, 'xor', lambda a, b: a ^ b, Number, 'number / boolean'),
         'correct_form': '<operator1> xor <operator2>',
-        'power': 2,
+        'power': 1.5,
         'args_expected': lambda i: i == 2
     },
     'and': {
         'structure': r'(\S+)\s+and\s+(\S+)',
-        'function': run_and,
+        'function': lambda groups: run_dual_arg_op(groups, 'and', lambda a, b: a and b, Number, 'number / boolean'),
         'correct_form': '<operator1> and <operator2>',
-        'power': 3,
+        'power': 2,
         'args_expected': lambda i: i == 2
     },
     'not': {
         'structure': r'not\s+(\S+)',
         'function': run_not,
         'correct_form': 'not <operator>',
-        'power': 4,
+        'power': 3,
         'args_expected': lambda i: i == 1
     },
     'shift left': {
         'structure': r'(\S+)\s+shift left\s+(\S+)',
-        'function': run_shift_left,
+        'function': lambda groups: run_dual_arg_op(groups, 'shift left',
+                                                   lambda a, b: a << b, Number, 'number / boolean'),
         'correct_form': '<operator1> shift left <operator2>',
-        'power': 3.5,
+        'power': 5,
         'args_expected': lambda i: i == 2
     },
     'shift right': {
         'structure': r'(\S+)\s+shift right\s+(\S+)',
-        'function': run_shift_right,
+        'function': lambda groups: run_dual_arg_op(groups, 'shift right',
+                                                   lambda a, b: a >> b, Number, 'number / boolean'),
         'correct_form': '<operator1> shift right <operator2>',
-        'power': 3.5,
+        'power': 5,
         'args_expected': lambda i: i == 2
     },
     'equals': {
         'structure': r'(\S+)\s+equals\s+(\S+)',
-        'function': run_equals,
+        'function': lambda groups: run_dual_arg_op(groups, 'equals',
+                                                   lambda a, b: a == b, Boolean, check_for_type=False),
         'correct_form': '<operator1> equals <operator2>',
-        'power': 0,
+        'power': 4,
         'args_expected': lambda i: i == 2
     },
     'different from': {
         'structure': r'(\S+)\s+different from\s+(\S+)',
-        'function': run_different,
+        'function': lambda groups: run_dual_arg_op(groups, 'different from',
+                                                   lambda a, b: a != b, Boolean, check_for_type=False),
         'correct_form': '<operator1> different from <operator2>',
-        'power': 0,
+        'power': 4,
         'args_expected': lambda i: i == 2
     },
     'greater than': {
         'structure': r'(\S+)\s+greater than\s+(\S+)',
-        'function': run_greater,
+        'function': lambda groups: run_dual_arg_op(groups, 'greater than', lambda a, b: a > b, Boolean,
+                                                   _types=[Number, String, Boolean, Array],
+                                                   _type_in_words='Number / Boolean / String / Array'),
         'correct_form': '<operator1> greater than <operator2>',
-        'power': 0,
+        'power': 4,
         'args_expected': lambda i: i == 2
     },
     'smaller than': {
         'structure': r'(\S+)\s+smaller than\s+(\S+)',
-        'function': run_smaller,
+        'function': lambda groups: run_dual_arg_op(groups, 'smaller than', lambda a, b: a < b, Boolean,
+                                                   _types=[Number, String, Boolean, Array],
+                                                   _type_in_words='Number / Boolean / String / Array'),
         'correct_form': '<operator1> smaller than <operator2>',
-        'power': 0,
+        'power': 4,
         'args_expected': lambda i: i == 2
     },
     'greater or equal than': {
         'structure': r'(\S+)\s+greater or equal than\s+(\S+)',
-        'function': run_greater_equal,
+        'function': lambda groups: run_dual_arg_op(groups, 'greater or equal', lambda a, b: a >= b, Boolean,
+                                                   _types=[Number, String, Boolean, Array],
+                                                   _type_in_words='Number / Boolean / String / Array'),
         'correct_form': '<operator1> greater or equal than <operator2>',
-        'power': 0,
+        'power': 4,
         'args_expected': lambda i: i == 2
     },
     'smaller or equal than': {
         'structure': r'(\S+)\s+smaller or equal than\s+(\S+)',
-        'function': run_smaller_equal,
+        'function': lambda groups: run_dual_arg_op(groups, 'smaller or equal', lambda a, b: a <= b, Boolean,
+                                                   _types=[Number, String, Boolean, Array],
+                                                   _type_in_words='Number / Boolean / String / Array'),
         'correct_form': '<operator1> smaller or equal than <operator2>',
-        'power': 0,
+        'power': 4,
         'args_expected': lambda i: i == 2
-    }
+    },
 }
+
+if __name__ == '__main__':
+    run_file()
+    # run_command('print "x is bigger than 10"')

@@ -31,6 +31,8 @@ def delete_variable(var_name):
 
 
 def type_of_variable(var, check_variables=True):
+    print(var, type(var))
+
     if var in RESERVED_WORDS:
         return [Error.UsageOfReservedWordRaiser(var)]
 
@@ -38,7 +40,7 @@ def type_of_variable(var, check_variables=True):
         variable_type = VARIABLE_TYPES.get(_)
         if var is None:
             return [Error.UnknownIdentifierRaiser(var)]
-        if variable_type.simple_validate(_, var):
+        if var is not None and variable_type.simple_validate(_, var):
             temp = variable_type.validate(var)
             if temp[0] is Error.SucceededValidation:
                 return [variable_type, temp[1]]
@@ -77,6 +79,7 @@ class Variable:
                 toret.append([pstack.pop(), i])
 
         if len(pstack) > 0:
+            print(pstack, toret)
             raise IndexError("No matching opening parens at: " + str(pstack.pop()))
 
         return toret
@@ -154,7 +157,7 @@ class Array(Variable):
 
     @staticmethod
     def simple_validate(var_type, value):
-        return value[0] == '[' and value[-1] == ']'
+        return len(value) > 0 and value[0] == '[' and value[-1] == ']'
 
     @staticmethod
     def validate(value):
@@ -802,8 +805,10 @@ VARIABLE_TYPES = {
     'map': Map,
 }
 
-from Operations import OPERATIONS
+# from Operations import OPERATIONS
 
-RESERVED_WORDS = list(VARIABLE_TYPES.keys()) + list(OPERATIONS.keys())
+RESERVED_WORDS = list(VARIABLE_TYPES.keys()) # + list(OPERATIONS.keys())
 
-VARIABLES = {'x': {'class_name': Number, 'value': 1}}
+VARIABLES = {}
+
+print(type_of_variable('[1, [], 2, 1 + 2 , \'hello there\', true, null, [{}, [], [1, 2, 3, [{a: 1}]]]]'))
