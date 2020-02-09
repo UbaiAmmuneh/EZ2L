@@ -95,15 +95,6 @@ def BadVariableNameRaiser(name):
     return BadVariableName(message)
 
 
-class IncomparableItems(Error):
-    pass
-
-
-def IncomparableItemsRaiser(value):
-    message = 'Item %s cannot be compared with other items.' % value
-    return IncomparableItems(message)
-
-
 class VariableNotFound(Error):
     pass
 
@@ -120,15 +111,6 @@ class BadSyntax(Error):
 def BadSyntaxRaiser(command, correct_syntax):
     message = 'Bad syntax provided, %s doesnt match the syntax %s.' % (command, correct_syntax)
     return BadSyntax(message)
-
-
-class SemiColonMissing(Error):
-    pass
-
-
-def SemiColonMissingRaiser(keyword, command):
-    message = 'Operation %s needs to end with a semicolon - \';\', %s doesnt.' % (keyword, command)
-    return SemiColonMissing(message)
 
 
 class UnknownOperation(Error):
@@ -204,7 +186,7 @@ def find_matching_parens(s, open_par, close_par):
 
 
 def check_variable_name(name):
-    if re.match(r'[a-zA-Z_]\w*', name):
+    if re.fullmatch(r'[a-zA-Z_]\w*', name):
         return SucceededValidation, name
     return FailedValidation, BadVariableNameRaiser(name)
 
@@ -243,7 +225,7 @@ def find_type(value):
         return [var.get('class_name'), var.get('value')]
 
     for var_type in VARIABLE_TYPES:
-        if re.match(VARIABLE_TYPES[var_type]['structure'], value):
+        if re.fullmatch(VARIABLE_TYPES[var_type]['structure'], value):
             _ = VARIABLE_TYPES[var_type]['checker'](value)
             if _[0] is SucceededValidation:
                 return [var_type, _[1]]
@@ -268,6 +250,7 @@ def array_checker(value):
 
     for i in range(len(value_split)):
         values = value_split[i].split(',')
+
         if len(brackets) > 0:
             if i == 0:
                 if values[-1] != '':
@@ -299,20 +282,67 @@ def array_checker(value):
                                                          '[<elements>]' if br[0] is '[' else '{<pairs>}')
 
         for j in range(len(values)):
-            res.append(run_command(values[j])[1])
+            _ = run_command(values[j])
+            if _[0] is SucceededValidation:
+                res.append(_[1])
+            else:
+                return FailedValidation, _[1]
 
     return SucceededValidation, res
 
 
 def map_checker(value):
     if value == '{}':
-        return SucceededValidation, dict()
+        return SucceededValidation, {}
 
     res = {}
     value = value[1:-1]
+    brackets = sorted(join_pairs(find_matching_parens(value, '[', ']') + find_matching_parens(value, '{', '}')),
+                      key=lambda i: i[0])
+    value_split = [i.strip().replace(', ', ',').replace(' ,', ',') for i in [value[:brackets[0][0]]] +
+                   [value[brackets[i - 1][1] + 1:brackets[i][0]] for i in range(1, len(brackets))] +
+                   [value[brackets[-1][1] + 1:]]] if len(brackets) > 0 else [value]
 
+    full_pair_regex = r'(?:(?:(?P<quote>[\'\"])([_a-zA-Z]\w*)(?P=quote))|([_a-zA-Z]\w*))\s*:\s*(.+)'
+    only_key_regex = r'(?:(?:(?P<quote>[\'\"])([_a-zA-Z]\w*)(?P=quote))|([_a-zA-Z]\w*))\s*:\s*'
 
-    return FailedValidation, res
+    for i in range(len(value_split)):
+        values = [i.strip() for i in value_split[i].split(',') if i != '']
+
+        for j in range(len(values)):
+            if not re.fullmatch(full_pair_regex, values[j]):
+                if j < len(values) - 1 or not re.fullmatch(only_key_regex, values[j]):
+                    return FailedValidation, InvalidKeyValuePairStructureRaiser(value)
+
+            if j < len(values) - 1 or \
+                    re.fullmatch(full_pair_regex, values[j]):
+                _ = re.findall(full_pair_regex, values[j])[0]
+                key = _[1] or _[2]
+                _ = run_command(_[-1])
+                if _[0] is SucceededValidation:
+                    _value = _[1]
+                    res = {**res, **{key: _value}}
+                else:
+                    return FailedValidation, _[1]
+            elif i > 0:
+                br = brackets[i - 1]
+                key = re.findall(only_key_regex, values[j])[0]
+
+                if value[br[0]] == '[' and value[br[-1]] == ']':
+                    _ = array_checker(value[br[0]: br[1] + 1])
+                    if _[0] is FailedValidation:
+                        return _
+                    res = {**res, **{key: _[1]}}
+                elif value[br[0]] == '{' and value[br[-1]] == '}':
+                    _ = map_checker(value[br[0]: br[1] + 1])
+                    if _[0] is FailedValidation:
+                        return _
+                    res = {**res, **{key: _[1]}}
+                else:
+                    return FailedValidation, BadSyntaxRaiser(value[br[0] + 1: br[1]],
+                                                             '[<elements>]' if br[0] is '[' else '{<pairs>}')
+
+    return SucceededValidation, res
 
 
 ########################################################################################################################
@@ -406,10 +436,10 @@ def find_else_end(lines, key='if'):
     problem = -1
 
     while i < len(lines):
-        if re.match(r'\s*' + key + r'.*', lines[i]):
+        if re.fullmatch(r'\s*' + key + r'.*', lines[i]):
             _ += 1
             problem = i
-        elif re.match(r'\s*end\s+' + key + r'\s*', lines[i]):
+        elif re.fullmatch(r'\s*end\s+' + key + r'\s*', lines[i]):
             if _ <= 0:
                 raise MissingForRaiser('an %s statement' % key, 'end %s statement inside of %s scope' % (key, lines[0]))
             if _ > 1:
@@ -418,7 +448,7 @@ def find_else_end(lines, key='if'):
             else:
                 _endif = i
                 break
-        elif re.match(r'\s*else\s*', lines[i]) and _ == 1 and _else < 0:
+        elif re.fullmatch(r'\s*else\s*', lines[i]) and _ == 1 and _else < 0:
             _else = i
 
         i += 1
@@ -434,7 +464,7 @@ def run_lines(lines):
     while i < len(lines):
         if len(lines[i].strip()) == 0:
             pass
-        elif re.match(r'\s*if.*', lines[i]):
+        elif re.fullmatch(r'\s*if.*', lines[i]):
             _else, _end = find_else_end(lines[i:])
             _else += (i if _else > -1 else 0)
             _end += i
@@ -449,7 +479,7 @@ def run_lines(lines):
                 run_lines(lines[_else + 1: _end])
 
             i = _end
-        elif re.match(r'\s*while.*', lines[i]):
+        elif re.fullmatch(r'\s*while.*', lines[i]):
             _end = find_else_end(lines[i:], key='while')[1] + i
             condition_text = re.findall(r'while\s+(.*)', lines[i])[0]
             condition = run_command(condition_text)
@@ -465,7 +495,7 @@ def run_lines(lines):
                     raise condition[1]
 
             i = _end
-        elif re.match(r'\s*for\s+(.+?)\s+from\s+(.+?)\s+to\s+(.+)\s*', lines[i]):
+        elif re.fullmatch(r'\s*for\s+(.+?)\s+from\s+(.+?)\s+to\s+(.+)\s*', lines[i]):
             _end_for = find_else_end(lines[i:], key='for')[1] + i
             _ = re.findall(r'\s*for\s+(.+?)\s+from\s+(.+?)\s+to\s+(.+)\s*', lines[i])
 
@@ -473,7 +503,7 @@ def run_lines(lines):
                 raise
 
             counter, start, end = _[0]
-            if re.match(r'(.+?)\s+jump\s+(.+)', end):
+            if re.fullmatch(r'(.+?)\s+jump\s+(.+)', end):
                 end, jump = re.findall(r'(.+?)\s+jump\s+(.+)', end)[0]
             else:
                 jump = 1
@@ -499,7 +529,7 @@ def run_lines(lines):
             delete_variable(counter)
 
             i = _end_for
-        elif re.match(r'\s*for\s+(.+?)\s+in\s+(.+?)\s*', lines[i]):
+        elif re.fullmatch(r'\s*for\s+(.+?)\s+in\s+(.+?)\s*', lines[i]):
             _end_for = find_else_end(lines[i:], key='for')[1] + i
             _ = re.findall(r'\s*for\s+(.+?)\s+in\s+(.+?)\s*', lines[i])
 
@@ -534,17 +564,16 @@ def run_print(groups):
         if _ == 'null':
             formatted = 'null'
         elif _ == 'boolean':
-            formatted = 'true' if re.match(r'[tT]rue', str(txt)) else 'false'
+            formatted = 'true' if re.fullmatch(r'[tT]rue', str(txt)) else 'false'
         elif _ == 'string':
             formatted = txt[1:-1]
             if len(formatted) >= 2:
                 if formatted[0] == formatted[-1] and formatted[0] in ['"', "'"]:
                     formatted = formatted[1:-1]
         elif _ == 'array':
-            formatted = [str(__format(i)) for i in _value]
-            formatted = '[' + ', '.join(formatted) + ']'
-        # elif _ == 'map':
-        #     formatted = {i: _value for i in _value}
+            formatted = '[' + ', '.join([str(__format(i)) for i in _value]) + ']'
+        elif _ == 'map':
+            formatted = '{' + ', '.join(['%s: %s' % (str(__format(i)), str(__format(_value[i]))) for i in _value]) + '}'
         elif _ is SucceededValidation:
             formatted = _value
         else:
@@ -687,11 +716,11 @@ VARIABLE_TYPES = {
     },
     'boolean': {
         'structure': r'([tT]rue)|([fF]alse)',
-        'checker': lambda value: (SucceededValidation, True if re.match(r'[tT]rue', value) else False)
+        'checker': lambda value: (SucceededValidation, True if re.fullmatch(r'[tT]rue', value) else False)
     },
     'number': {
         'structure': r'(\-)?(\d+)(\.\d+)?',
-        'checker': lambda value: (SucceededValidation, int(value) if re.match(r'-?\d+', value) else float(value))
+        'checker': lambda value: (SucceededValidation, int(value) if re.fullmatch(r'-?\d+', value) else float(value))
     },
     'string': {
         'structure': r'\'\'|\"\"|(?P<quote>[\'\"]).*?[^\\](?P=quote)',
@@ -702,7 +731,7 @@ VARIABLE_TYPES = {
         'checker': array_checker
     },
     'map': {
-        'structure': r'',
+        'structure': r'\{((?:(?:(?P<quote>[\'\"])([_a-zA-Z]\w*)(?P=quote))|([_a-zA-Z]\w*))\s*\:\s*(.*?))*\s*\}',
         'checker': map_checker
     }
 }
@@ -896,6 +925,3 @@ FUNCTIONS = {}
 
 if __name__ == '__main__':
     run_file()
-    # print(map_checker('{}'))
-    # print(map_checker('{a: 1}'))
-    # print(map_checker('{a:1, b:-1.54, c:x, d:null, e:true, f:false, g: [], h:[1, 2, 3], i:[[], 1, 2, 3, [{}, {}, {a:1}]], j: {}, k: {a:1, b:2, c:3}'))

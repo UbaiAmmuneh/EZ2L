@@ -55,8 +55,9 @@ end for
 
 
 
-set y to [1, 1 + 2, 'hi there']
-
+set x to [1, 1 + 2, 'hello there']
+set y to {a: 1, b: 'hi'}
+print x
 print y
 /*
 for i in y
