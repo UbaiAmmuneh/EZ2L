@@ -31,8 +31,6 @@ def delete_variable(var_name):
 
 
 def type_of_variable(var, check_variables=True):
-    print(var, type(var))
-
     if var in RESERVED_WORDS:
         return [Error.UsageOfReservedWordRaiser(var)]
 

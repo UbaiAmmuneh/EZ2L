@@ -6,9 +6,9 @@ set x to 12
 /* Multi
 Line
 Comment */ set x to x - 5
-
-// print x
 /*
+print x
+
 if x greater than 10 and x smaller than 15
     print 'x is bigger than 10'
 else
@@ -28,8 +28,10 @@ else
         print 'x is 6'
     end if
 end if
-*/
-/*
+
+
+
+
 set i to 0
 set sep to ' '
 
@@ -42,22 +44,28 @@ end while
 print ''
 
 print i
-*/
-/*
+
+
+
+
 for i from 5 to 20
     print i end with ' '
 end for
 */
-/*
-set y to [1, 2, 3]
 
+
+
+set y to [1, 1 + 2, 'hi there']
+
+print y
+/*
 for i in y
     print i
-end for*/
-
+end for
+*//*
 set a to {}
 set b to {a: 1}
 print a
 print b
 
-set x to [1, [], 2, 1 + 2 , 'hello there', true, null, [{}, [], [1, 2, 3, [{a: 1}]]]]
+set x to [1, [], 2, 1 + 2 , 'hello there', true, null, [{}, [], [1, 2, 3, [{a: 1}]]]]*/
