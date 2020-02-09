@@ -1,4 +1,6 @@
 import re
+import random
+import math
 
 
 ########################################################################################################################
@@ -185,25 +187,8 @@ def find_matching_parens(s, open_par, close_par):
     return result
 
 
-def check_variable_name(name):
-    if re.fullmatch(r'[a-zA-Z_]\w*', name):
-        return SucceededValidation, name
-    return FailedValidation, BadVariableNameRaiser(name)
-
-
 def variable_exists(var_name):
     return var_name.__hash__ is not None and var_name in VARIABLES
-
-
-def add_variable(var_name, var_type, var_value):
-    VARIABLES[var_name] = {'class_name': var_type[0], 'value': var_value}
-
-
-def get_variable(var_name):
-    if variable_exists(var_name):
-        return VARIABLES.get(var_name, None)
-
-    return VariableNotFoundRaiser(var_name)
 
 
 def delete_variable(var_name):
@@ -348,6 +333,37 @@ def map_checker(value):
 ########################################################################################################################
 
 
+def find_else_end(lines, key='if'):
+    i = 1
+    _ = 1
+    _else = -1
+    _endif = -1
+    problem = -1
+
+    while i < len(lines):
+        if re.fullmatch(r'\s*' + key + r'.*', lines[i]):
+            _ += 1
+            problem = i
+        elif re.fullmatch(r'\s*end\s+' + key + r'\s*', lines[i]):
+            if _ <= 0:
+                raise MissingForRaiser('an %s statement' % key, 'end %s statement inside of %s scope' % (key, lines[0]))
+            if _ > 1:
+                _ -= 1
+                problem = -1
+            else:
+                _endif = i
+                break
+        elif re.fullmatch(r'\s*else\s*', lines[i]) and _ == 1 and _else < 0:
+            _else = i
+
+        i += 1
+
+    if i == len(lines):
+        raise MissingForRaiser('<end %s>' % key, lines[problem])
+
+    return _else, _endif
+
+
 def run_command(command, previous_ops=None):
     if command is None or previous_ops == []:
         return SucceededValidation, command
@@ -411,9 +427,8 @@ def run_command(command, previous_ops=None):
 
 
 def run_file(file_name='main.ezdata'):
-    f = open(file_name + ('.ezdata' if file_name[-7:] != '.ezdata' else ''), 'r')
-    lines = "".join(f.readlines())
-    f.close()
+    with open(file_name + ('.ezdata' if file_name[-7:] != '.ezdata' else ''), 'r') as file:
+        lines = "".join(file.readlines())
 
     while '//' in lines:
         s = re.search(r'//[^\n]*', lines)
@@ -423,44 +438,12 @@ def run_file(file_name='main.ezdata'):
         s = re.search(r'/\*.*?\*/', lines, re.DOTALL)
         lines = lines.replace(lines[s.start():s.end()], '')
 
-    lines = [i.strip() for i in lines.split('\n') if i != '']
-
-    run_lines(lines)
-
-
-def find_else_end(lines, key='if'):
-    i = 1
-    _ = 1
-    _else = -1
-    _endif = -1
-    problem = -1
-
-    while i < len(lines):
-        if re.fullmatch(r'\s*' + key + r'.*', lines[i]):
-            _ += 1
-            problem = i
-        elif re.fullmatch(r'\s*end\s+' + key + r'\s*', lines[i]):
-            if _ <= 0:
-                raise MissingForRaiser('an %s statement' % key, 'end %s statement inside of %s scope' % (key, lines[0]))
-            if _ > 1:
-                _ -= 1
-                problem = -1
-            else:
-                _endif = i
-                break
-        elif re.fullmatch(r'\s*else\s*', lines[i]) and _ == 1 and _else < 0:
-            _else = i
-
-        i += 1
-
-    if i == len(lines):
-        raise MissingForRaiser('<end %s>' % key, lines[problem])
-
-    return _else, _endif
+    run_lines([i.strip() for i in lines.split('\n') if i != ''])
 
 
 def run_lines(lines):
     i = 0
+
     while i < len(lines):
         if len(lines[i].strip()) == 0:
             pass
@@ -549,6 +532,7 @@ def run_lines(lines):
             delete_variable(counter)
 
             i = _end_for
+
         else:
             run_command(lines[i])
 
@@ -640,7 +624,11 @@ def run_typeof(groups):
 
 
 def run_set(groups):
-    var_name = check_variable_name(groups[0])
+    if re.fullmatch(r'[a-zA-Z_]\w*', groups[0]):
+        var_name = groups[0]
+    else:
+        raise BadVariableNameRaiser(groups[0])
+
     var_value = run_command(groups[1])
 
     if var_name[0] is FailedValidation:
@@ -654,7 +642,7 @@ def run_set(groups):
     if len(var_type) == 1:
         raise var_type[0]
 
-    add_variable(var_name[1], var_type, var_value[1])
+    VARIABLES[var_name] = {'class_name': var_type[0], 'value': var_value[1]}
 
 
 def run_dual_arg_op(groups, op, f, _type, _type_in_words=None, check_for_type=True, _types=None):
@@ -823,21 +811,24 @@ OPERATIONS = {
     },
     'or': {
         'structure': r'(\S+)\s+or\s+(\S+)',
-        'function': lambda groups: run_dual_arg_op(groups, 'or', lambda a, b: a or b, 'number', 'number / boolean'),
+        'function': lambda groups: run_dual_arg_op(groups, 'or', lambda a, b: a or b, 'number', 'number / boolean',
+                                                   _types=['number', 'boolean']),
         'correct_form': '<operator1> or <operator2>',
         'power': 1,
         'args_expected': lambda i: i == 2
     },
     'xor': {
         'structure': r'(\S+)\s+xor\s+(\S+)',
-        'function': lambda groups: run_dual_arg_op(groups, 'xor', lambda a, b: a ^ b, 'number', 'number / boolean'),
+        'function': lambda groups: run_dual_arg_op(groups, 'xor', lambda a, b: a ^ b, 'number', 'number / boolean',
+                                                   _types=['number', 'boolean']),
         'correct_form': '<operator1> xor <operator2>',
         'power': 1.5,
         'args_expected': lambda i: i == 2
     },
     'and': {
         'structure': r'(\S+)\s+and\s+(\S+)',
-        'function': lambda groups: run_dual_arg_op(groups, 'and', lambda a, b: a and b, 'number', 'number / boolean'),
+        'function': lambda groups: run_dual_arg_op(groups, 'and', lambda a, b: a and b, 'number', 'number / boolean',
+                                                   _types=['number', 'boolean']),
         'correct_form': '<operator1> and <operator2>',
         'power': 2,
         'args_expected': lambda i: i == 2
@@ -921,7 +912,6 @@ OPERATIONS = {
 RESERVED_WORDS = list(VARIABLE_TYPES.keys()) + list(OPERATIONS.keys())
 VARIABLES = {}
 FUNCTIONS = {}
-
 
 if __name__ == '__main__':
     run_file()
