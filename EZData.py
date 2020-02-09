@@ -428,15 +428,13 @@ def run_command(command, previous_ops=None):
 
 def run_file(file_name='main.ezdata'):
     with open(file_name + ('.ezdata' if file_name[-7:] != '.ezdata' else ''), 'r') as file:
-        lines = "".join(file.readlines())
+        lines = ''.join(file.readlines())
 
     while '//' in lines:
-        s = re.search(r'//[^\n]*', lines)
-        lines = lines.replace(lines[s.start():s.end()], '')
+        lines = ''.join(re.split(r'//.*', lines))
 
     while '/*' in lines:
-        s = re.search(r'/\*.*?\*/', lines, re.DOTALL)
-        lines = lines.replace(lines[s.start():s.end()], '')
+        lines = ''.join(re.split(r'/\*.*?\*/', lines))
 
     run_lines([i.strip() for i in lines.split('\n') if i != ''])
 
@@ -645,54 +643,47 @@ def run_set(groups):
     VARIABLES[var_name] = {'class_name': var_type[0], 'value': var_value[1]}
 
 
-def run_dual_arg_op(groups, op, f, _type, _type_in_words=None, check_for_type=True, _types=None):
-    op1 = run_command(groups[0])
-    op2 = run_command(groups[1])
+def run_shuffle(groups):
+    _op = run_command(groups[0])
 
-    if op1[0] is FailedValidation:
-        raise op1[1]
+    if _op[0] is FailedValidation:
+        raise _op[1]
 
-    if op2[0] is FailedValidation:
-        raise op2[1]
+    if find_type(_op[1])[0] is not 'array':
+        raise WrongOperationArgumentTypeRaiser('shuffle', groups[0], 'array')
 
-    if _types:
-        if not any(find_type(op1[1])[0] is i for i in _types):
-            raise WrongOperationArgumentTypeRaiser(op, groups[0], _type_in_words)
+    arr = find_type(_op[1])[1]
+    random.shuffle(arr)
 
-        if not any(find_type(op2[1])[0] is i for i in _types):
-            raise WrongOperationArgumentTypeRaiser(op, groups[0], _type_in_words)
+    if re.fullmatch(r'[_a-zA-Z]\w*', groups[0]):
+        run_set((groups[0], str(arr)))
+
+    return arr
+
+
+def run_n_arg_op(n, groups, op, f, _type=None, _types=None):
+    ops = []
+    for i in range(n):
+        _ = run_command(groups[i])
+        if _[0] is FailedValidation:
+            raise _[1]
+        if _types and all(find_type(_[1])[0] is not i for i in _types):
+            raise WrongOperationArgumentTypeRaiser(op, groups[i], ' / '.join(_types))
+        elif _type and find_type(_[1])[0] is not _type:
+            raise WrongOperationArgumentTypeRaiser(op, groups[i], _type)
+        ops.append(_[1])
+
+    return f(*ops)
+
+
+def run_pick(groups):
+    if len(groups) == 3:
+        start, end, jump = run_n_arg_op(3, groups, 'pick number', lambda *args: args, _type='number')
     else:
-        if check_for_type and find_type(op1[1])[0] is not _type:
-            raise WrongOperationArgumentTypeRaiser(op, groups[0], _type_in_words or _type.keyword)
+        start, end = run_n_arg_op(2, groups, 'pick number', lambda *args: args, _type='number')
+        jump = 1
 
-        if check_for_type and find_type(op2[1])[0] is not _type:
-            raise WrongOperationArgumentTypeRaiser(op, groups[1], _type_in_words or _type.keyword)
-
-    return f(op1[1], op2[1])
-
-
-def run_not(groups):
-    op = run_command(groups[0])
-
-    if op[0] is FailedValidation:
-        raise op[1]
-
-    if find_type(op[1])[0] is not 'number':
-        raise WrongOperationArgumentTypeRaiser('not', groups[0], 'boolean')
-
-    return not op[1]
-
-
-def run_sqrt(groups):
-    op = run_command(groups[0])
-
-    if op[0] is FailedValidation:
-        raise op[1]
-
-    if find_type(op[1])[0] is not 'number':
-        raise WrongOperationArgumentTypeRaiser('not', groups[0], 'number')
-
-    return op[1] ** 0.5
+    return random.randrange(start, stop=end, step=jump)
 
 
 ########################################################################################################################
@@ -732,7 +723,7 @@ OPERATIONS = {
         'args_expected': lambda i: 2 >= i >= 1
     },
     'input': {
-        'structure': r'input\s*(?:message\s+(\S.*))?',
+        'structure': r'input\s*?(?: message\s+(\S.*))?',
         'function': run_input,
         'correct_form': 'input (message <message>)',
         'power': 10,
@@ -761,35 +752,35 @@ OPERATIONS = {
     },
     '+': {
         'structure': r'((?:\-?\d+(?:\.\d+)?)+|(?:[_a-zA-Z]\w*))\s+[+]\s+((?:\-?\d+(?:\.\d+)?)+|(?:[_a-zA-Z]\w*))',
-        'function': lambda groups: run_dual_arg_op(groups, '+', lambda a, b: a + b, 'number'),
+        'function': lambda groups: run_n_arg_op(2, groups, '+', lambda a, b: a + b, _type='number'),
         'correct_form': '<operator1> + <operator2>',
         'power': 6,
         'args_expected': lambda i: i == 2
     },
     '- ': {
         'structure': r'((?:\-?\d+(?:\.\d+)?)+|(?:[_a-zA-Z]\w*))\s+[-]\s+((?:\-?\d+(?:\.\d+)?)+|(?:[_a-zA-Z]\w*))',
-        'function': lambda groups: run_dual_arg_op(groups, '-', lambda a, b: a - b, 'number'),
+        'function': lambda groups: run_n_arg_op(2, groups, '-', lambda a, b: a - b, _type='number'),
         'correct_form': '<operator1> - <operator2>',
         'power': 6,
         'args_expected': lambda i: i == 2
     },
     '* ': {
         'structure': r'((?:\-?\d+(?:\.\d+)?)+|(?:[_a-zA-Z]\w*))\s+[*]\s+((?:\-?\d+(?:\.\d+)?)+|(?:[_a-zA-Z]\w*))',
-        'function': lambda groups: run_dual_arg_op(groups, '*', lambda a, b: a * b, 'number'),
+        'function': lambda groups: run_n_arg_op(2, groups, '*', lambda a, b: a * b, _type='number'),
         'correct_form': '<operator1> * <operator2>',
         'power': 7,
         'args_expected': lambda i: i == 2
     },
     '/': {
         'structure': r'((?:\-?\d+(?:\.\d+)?)+|(?:[_a-zA-Z]\w*))\s+[/]\s+((?:\-?\d+(?:\.\d+)?)+|(?:[_a-zA-Z]\w*))',
-        'function': lambda groups: run_dual_arg_op(groups, '/', lambda a, b: a / b, 'number'),
+        'function': lambda groups: run_n_arg_op(2, groups, '/', lambda a, b: a / b, _type='number'),
         'correct_form': '<operator1> / <operator2>',
         'power': 7,
         'args_expected': lambda i: i == 2
     },
     '%': {
         'structure': r'((?:\-?\d+(?:\.\d+)?)+|(?:[_a-zA-Z]\w*))\s+[%]\s+((?:\-?\d+(?:\.\d+)?)+|(?:[_a-zA-Z]\w*))',
-        'function': lambda groups: run_dual_arg_op(groups, '%', lambda a, b: a % b, 'number'),
+        'function': lambda groups: run_n_arg_op(2, groups, '%', lambda a, b: a % b, _type='number'),
         'correct_form': '<operator1> % <operator2>',
         'power': 7,
         'args_expected': lambda i: i == 2
@@ -797,116 +788,130 @@ OPERATIONS = {
     'raise': {
         'structure':
             r'raise\s+((?:\-?\d+(?:\.\d+)?)+|(?:[_a-zA-Z]\w*))\s+to\s+power\s+((?:\-?\d+(?:\.\d+)?)+|(?:[_a-zA-Z]\w*))',
-        'function': lambda groups: run_dual_arg_op(groups, 'raise to power', lambda a, b: a ** b, 'number'),
+        'function': lambda groups: run_n_arg_op(2, groups, 'raise to power', lambda a, b: a ** b, _type='number'),
         'correct_form': 'raise <operator> to power <power>',
         'power': 8,
         'args_expected': lambda i: i == 2
     },
     'sqrt': {
         'structure': r'sqrt\s+of\s+((?:\-?\d+(?:\.\d+)?)+|(?:[_a-zA-Z]\w*))',
-        'function': run_sqrt,
+        'function': lambda groups: run_n_arg_op(1, groups, 'sqrt', lambda x: x ** 0.5, _type='number'),
         'correct_form': 'sqrt of <operator>',
         'power': 8,
         'args_expected': lambda i: i == 1
     },
     'or': {
         'structure': r'(\S+)\s+or\s+(\S+)',
-        'function': lambda groups: run_dual_arg_op(groups, 'or', lambda a, b: a or b, 'number', 'number / boolean',
-                                                   _types=['number', 'boolean']),
+        'function': lambda groups: run_n_arg_op(2, groups, 'or', lambda a, b: a or b, 'number',
+                                                _types=['number', 'boolean']),
         'correct_form': '<operator1> or <operator2>',
         'power': 1,
         'args_expected': lambda i: i == 2
     },
     'xor': {
         'structure': r'(\S+)\s+xor\s+(\S+)',
-        'function': lambda groups: run_dual_arg_op(groups, 'xor', lambda a, b: a ^ b, 'number', 'number / boolean',
-                                                   _types=['number', 'boolean']),
+        'function': lambda groups: run_n_arg_op(2, groups, 'xor', lambda a, b: a ^ b, 'number',
+                                                _types=['number', 'boolean']),
         'correct_form': '<operator1> xor <operator2>',
         'power': 1.5,
         'args_expected': lambda i: i == 2
     },
     'and': {
         'structure': r'(\S+)\s+and\s+(\S+)',
-        'function': lambda groups: run_dual_arg_op(groups, 'and', lambda a, b: a and b, 'number', 'number / boolean',
-                                                   _types=['number', 'boolean']),
+        'function': lambda groups: run_n_arg_op(2, groups, 'and', lambda a, b: a and b, _types=['number', 'boolean']),
         'correct_form': '<operator1> and <operator2>',
         'power': 2,
         'args_expected': lambda i: i == 2
     },
     'not': {
         'structure': r'not\s+(\S+)',
-        'function': run_not,
+        'function': lambda groups: run_n_arg_op(1, groups, 'not', lambda x: not x, _types=['number', 'boolean']),
         'correct_form': 'not <operator>',
         'power': 3,
         'args_expected': lambda i: i == 1
     },
     'shift left': {
         'structure': r'(\S+)\s+shift left\s+(\S+)',
-        'function': lambda groups: run_dual_arg_op(groups, 'shift left',
-                                                   lambda a, b: a << b, 'number', 'number / boolean'),
+        'function': lambda groups: run_n_arg_op(2, groups, 'shift left', lambda a, b: a << b,
+                                                _types=['number', 'boolean']),
         'correct_form': '<operator1> shift left <operator2>',
         'power': 5,
         'args_expected': lambda i: i == 2
     },
     'shift right': {
         'structure': r'(\S+)\s+shift right\s+(\S+)',
-        'function': lambda groups: run_dual_arg_op(groups, 'shift right',
-                                                   lambda a, b: a >> b, 'number', 'number / boolean'),
+        'function': lambda groups: run_n_arg_op(2, groups, 'shift right', lambda a, b: a >> b,
+                                                _types=['number', 'boolean']),
         'correct_form': '<operator1> shift right <operator2>',
         'power': 5,
         'args_expected': lambda i: i == 2
     },
     'equals': {
         'structure': r'(\S+)\s+equals\s+(\S+)',
-        'function': lambda groups: run_dual_arg_op(groups, 'equals',
-                                                   lambda a, b: a == b, 'boolean', check_for_type=False),
+        'function': lambda groups: run_n_arg_op(2, groups, 'equals', lambda a, b: a == b),
         'correct_form': '<operator1> equals <operator2>',
         'power': 4,
         'args_expected': lambda i: i == 2
     },
     'different from': {
         'structure': r'(\S+)\s+different from\s+(\S+)',
-        'function': lambda groups: run_dual_arg_op(groups, 'different from',
-                                                   lambda a, b: a != b, 'boolean', check_for_type=False),
+        'function': lambda groups: run_n_arg_op(2, groups, 'different from', lambda a, b: a != b),
         'correct_form': '<operator1> different from <operator2>',
         'power': 4,
         'args_expected': lambda i: i == 2
     },
     'greater than': {
         'structure': r'(\S+)\s+greater than\s+(\S+)',
-        'function': lambda groups: run_dual_arg_op(groups, 'greater than', lambda a, b: a > b, 'boolean',
-                                                   _types=['number', 'string', 'boolean', 'array'],
-                                                   _type_in_words='number / boolean / String / Array'),
+        'function': lambda groups: run_n_arg_op(2, groups, 'greater than', lambda a, b: a > b,
+                                                _types=['number', 'string', 'boolean', 'array']),
         'correct_form': '<operator1> greater than <operator2>',
         'power': 4,
         'args_expected': lambda i: i == 2
     },
     'smaller than': {
         'structure': r'(\S+)\s+smaller than\s+(\S+)',
-        'function': lambda groups: run_dual_arg_op(groups, 'smaller than', lambda a, b: a < b, 'boolean',
-                                                   _types=['number', 'string', 'boolean', 'array'],
-                                                   _type_in_words='number / boolean / String / Array'),
+        'function': lambda groups: run_n_arg_op(2, groups, 'smaller than', lambda a, b: a < b,
+                                                _types=['number', 'string', 'boolean', 'array']),
         'correct_form': '<operator1> smaller than <operator2>',
         'power': 4,
         'args_expected': lambda i: i == 2
     },
     'greater or equal than': {
         'structure': r'(\S+)\s+greater or equal than\s+(\S+)',
-        'function': lambda groups: run_dual_arg_op(groups, 'greater or equal', lambda a, b: a >= b, 'boolean',
-                                                   _types=['number', 'string', 'boolean', 'array'],
-                                                   _type_in_words='number / boolean / String / Array'),
+        'function': lambda groups: run_n_arg_op(2, groups, 'greater or equal', lambda a, b: a >= b,
+                                                _types=['number', 'string', 'boolean', 'array']),
         'correct_form': '<operator1> greater or equal than <operator2>',
         'power': 4,
         'args_expected': lambda i: i == 2
     },
     'smaller or equal than': {
         'structure': r'(\S+)\s+smaller or equal than\s+(\S+)',
-        'function': lambda groups: run_dual_arg_op(groups, 'smaller or equal', lambda a, b: a <= b, 'boolean',
-                                                   _types=['number', 'string', 'boolean', 'array'],
-                                                   _type_in_words='number / boolean / String / Array'),
+        'function': lambda groups: run_n_arg_op(2, groups, 'smaller or equal', lambda a, b: a <= b,
+                                                _types=['number', 'string', 'boolean', 'array']),
         'correct_form': '<operator1> smaller or equal than <operator2>',
         'power': 4,
         'args_expected': lambda i: i == 2
+    },
+    'pick from': {
+        'structure': r'pick\s+from\s+(\S.*)',
+        'function': lambda groups: run_n_arg_op(1, groups, 'pick from', lambda i: random.choice(i), _type='array'),
+        'correct_form': 'pick from <array>',
+        'power': 10,
+        'args_expected': lambda i: i == 1
+    },
+    'shuffle': {
+        'structure': r'shuffle\s+([_a-zA-Z]\w*)',
+        'function': run_shuffle,
+        'correct_form': 'shuffle <array>',
+        'power': 10,
+        'args_expected': lambda i: i == 1
+    },
+    'pick number': {
+        'structure': r'pick\s+number\s+start\s+(\S+)\s+stop\s+(\S+)\s*?(?: jump\s+(\S.*))?',
+        'function': run_pick,
+        'correct_form': 'pick number start <start> stop <end> (jump <jump>)',
+        'power': 10,
+        'args_expected': lambda i: 3 >= i >= 2
     },
 }
 RESERVED_WORDS = list(VARIABLE_TYPES.keys()) + list(OPERATIONS.keys())
