@@ -1,1 +1,23 @@
-print pick number start 5 stop 10 jump 2
+/*set x to 17
+
+function name (x = 1, y)
+    print x
+    print y
+end function
+*/
+function sum(x, y)
+    return x + y
+end function
+/*
+name(5, 4)
+
+function f3(x, y)
+    print 'huuuhhuh'
+end function
+*/
+// name(5, 4)
+
+set a to sum(5, 6)
+print a
+print sum(11, 12)
+sum(11, 12)

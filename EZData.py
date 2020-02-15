@@ -137,8 +137,8 @@ class WrongOperationArgumentCount(Error):
     pass
 
 
-def WrongOperationArgumentCountRaiser(op, required_args_count, command):
-    message = 'Operation %s requires %s arguments, got %s' % (op, required_args_count, command)
+def WrongOperationArgumentCountRaiser(op, required_args_count, got):
+    message = 'Operation %s requires %s arguments, got %s' % (op, required_args_count, got)
     return WrongOperationArgumentCount(message)
 
 
@@ -149,6 +149,15 @@ class MissingFor(Error):
 def MissingForRaiser(what, where):
     message = 'Missing %s for %s' % (what, where)
     raise MissingFor(message)
+
+
+class NotIn(Error):
+    pass
+
+
+def NotInRaiser(command, _com, _in):
+    message = '%s in %s must be in %s scope' % (_com, command, _in)
+    return NotIn(message)
 
 
 ########################################################################################################################
@@ -377,13 +386,15 @@ def run_command(command, previous_ops=None):
     _c = re.compile(r'([\'"].*[\'"])').sub(r"", command)
 
     if '(' in _c:
-        start, end = find_matching_parens(command, '(', ')')[-1]
-        inner = run_command(command[start + 1: end])
+        f = re.findall(r'.*?\s*([_a-zA-Z]\w*)\s*\(.*?\)', command)
+        if len(f) == 0 or f[0] not in FUNCTIONS:
+            start, end = find_matching_parens(command, '(', ')')[-1]
+            inner = run_command(command[start + 1: end])
 
-        if inner[0] is FailedValidation:
-            raise inner[1]
+            if inner[0] is FailedValidation:
+                raise inner[1]
 
-        return run_command(command[:start] + inner[1] + command[end + 1:])
+            return run_command(command[:start] + inner[1] + command[end + 1:])
 
     ops = sorted(sorted([op for op in OPERATIONS if op in _c], key=lambda op: -OPERATIONS[op]['power']),
                  key=lambda op: -len(re.findall(OPERATIONS[op]['structure'], command)))
@@ -392,7 +403,6 @@ def run_command(command, previous_ops=None):
         raise UnknownOperationRaiser(command)
 
     operation = ops[0]
-
     match = re.search(OPERATIONS[operation]['structure'], command)
     groups = re.findall(OPERATIONS[operation]['structure'], command) if match is not None else None
     _ = groups[0] if type(groups[0]) is tuple else groups
@@ -434,12 +444,12 @@ def run_file(file_name='main.ezdata'):
         lines = ''.join(re.split(r'//.*', lines))
 
     while '/*' in lines:
-        lines = ''.join(re.split(r'/\*.*?\*/', lines))
+        lines = ''.join(re.split(r'/\*.*?\*/', lines, flags=re.DOTALL))
 
     run_lines([i.strip() for i in lines.split('\n') if i != ''])
 
 
-def run_lines(lines):
+def run_lines(lines, _in=None):
     i = 0
 
     while i < len(lines):
@@ -480,9 +490,6 @@ def run_lines(lines):
             _end_for = find_else_end(lines[i:], key='for')[1] + i
             _ = re.findall(r'\s*for\s+(.+?)\s+from\s+(.+?)\s+to\s+(.+)\s*', lines[i])
 
-            if len(_) == 0:
-                raise
-
             counter, start, end = _[0]
             if re.fullmatch(r'(.+?)\s+jump\s+(.+)', end):
                 end, jump = re.findall(r'(.+?)\s+jump\s+(.+)', end)[0]
@@ -503,19 +510,20 @@ def run_lines(lines):
             if _jump[0] is not 'number':
                 raise WrongOperationArgumentTypeRaiser('for-from-to', jump, 'number')
 
+            previous = None if counter not in VARIABLES else VARIABLES.get(counter).get('value')
             for j in range(_start[1], _end[1], _jump[1]):
                 run_set([counter, str(j)])
                 run_lines(lines[i + 1: _end_for])
 
             delete_variable(counter)
 
+            if previous:
+                run_set((counter, str(previous)))
+
             i = _end_for
         elif re.fullmatch(r'\s*for\s+(.+?)\s+in\s+(.+?)\s*', lines[i]):
             _end_for = find_else_end(lines[i:], key='for')[1] + i
             _ = re.findall(r'\s*for\s+(.+?)\s+in\s+(.+?)\s*', lines[i])
-
-            if len(_) == 0:
-                raise
 
             counter, where = _[0]
             _where = find_type(where)
@@ -523,18 +531,84 @@ def run_lines(lines):
             if _where[0] not in ['array', 'map']:
                 raise WrongOperationArgumentTypeRaiser('for-in', where, 'collection (Array / Map)')
 
+            previous = None if counter not in VARIABLES else VARIABLES.get(counter).get('value')
             for j in _where[1]:
                 run_set([counter, str(j)])
                 run_lines(lines[i + 1: _end_for])
 
             delete_variable(counter)
+            if previous:
+                run_set((counter, str(previous)))
 
             i = _end_for
+        elif re.fullmatch(r'\s*function\s+([_a-zA-Z]\w*)\s*\((.*?)\)\s*', lines[i]):
+            _end_function = find_else_end(lines[i:], key='function')[1] + i
+            code = lines[i + 1: _end_function]
+            name, args = re.findall(r'\s*function\s+([_a-zA-Z]\w*)\s*\((.*?)\)\s*', lines[i])[0]
+            _args = []
+            temp = ''
+            f = True
 
+            for _i in args:
+                if _i in '[{':
+                    f = False
+                elif _i in ']}':
+                    f = True
+                elif _i == ',' and f:
+                    _args.append(temp)
+                    temp = ''
+                else:
+                    temp += _i
+
+            unformatted = args
+            _args.append(temp)
+            args = []
+
+            for _i in _args:
+                if '=' in _i:
+                    arg_name, default = re.findall(r'([_a-zA-Z]\w*)\s*=\s*(.*)', _i)[0]
+                else:
+                    arg_name, default = _i, None
+                args.append((arg_name, default))
+
+            FUNCTIONS[name] = {
+                'code': code,
+                'args': dict(args)
+            }
+
+            OPERATIONS[name] = {
+                'structure': r'%s\s*\((.*?)\)' % name,
+                'function': run_function(name),
+                'correct_form': '%s(%s)' % (name, unformatted),
+                'power': 10,
+                'args_expected': lambda _i: _i == 1
+            }
+
+            del name
+            i = _end_function
+        elif re.fullmatch(r'\s*return\s+(.*)\s*', lines[i]):
+            if _in != 'function':
+                raise NotInRaiser(lines[i], 'return', 'function')
+            return run_command(re.findall(r'\s*return\s+(.*)\s*', lines[i])[0].strip())[1]
         else:
             run_command(lines[i])
 
         i += 1
+
+
+def run_n_arg_op(n, groups, op, f, _type=None, _types=None):
+    ops = []
+    for i in range(n):
+        _ = run_command(groups[i])
+        if _[0] is FailedValidation:
+            raise _[1]
+        if _types and all(find_type(_[1])[0] is not i for i in _types):
+            raise WrongOperationArgumentTypeRaiser(op, groups[i], ' / '.join(_types))
+        elif _type and find_type(_[1])[0] is not _type:
+            raise WrongOperationArgumentTypeRaiser(op, groups[i], _type)
+        ops.append(_[1])
+
+    return f(*ops)
 
 
 def run_print(groups):
@@ -661,21 +735,6 @@ def run_shuffle(groups):
     return arr
 
 
-def run_n_arg_op(n, groups, op, f, _type=None, _types=None):
-    ops = []
-    for i in range(n):
-        _ = run_command(groups[i])
-        if _[0] is FailedValidation:
-            raise _[1]
-        if _types and all(find_type(_[1])[0] is not i for i in _types):
-            raise WrongOperationArgumentTypeRaiser(op, groups[i], ' / '.join(_types))
-        elif _type and find_type(_[1])[0] is not _type:
-            raise WrongOperationArgumentTypeRaiser(op, groups[i], _type)
-        ops.append(_[1])
-
-    return f(*ops)
-
-
 def run_pick(groups):
     if len(groups) == 3:
         start, end, jump = run_n_arg_op(3, groups, 'pick number', lambda *args: args, _type='number')
@@ -686,7 +745,87 @@ def run_pick(groups):
     return random.randrange(start, stop=end, step=jump)
 
 
+def run_function(name):
+    def inner(groups):
+        func = FUNCTIONS.get(name)
+        optional = [i.strip() for i in func.get('args') if func.get('args').get(i) is not None]
+        required = [i.strip() for i in func.get('args') if func.get('args').get(i) is None]
+        final_args = {}
+        _args = []
+        temp = ''
+        f = True
+        for i in groups[0]:
+            if i in '[{':
+                f = False
+            elif i in '}]':
+                f = True
+            elif i == ',' and f:
+                _args.append(temp)
+                temp = ''
+            else:
+                temp += i
+        _args.append(temp)
+
+        args = [run_command(i) for i in _args]
+        for _ in range(len(args)):
+            if args[_][0] is FailedValidation:
+                raise args[_][1]
+            args[_] = args[_][1]
+
+        if len(args) < len(required) or len(args) > len(func.get('args')):
+            raise WrongOperationArgumentCountRaiser(name, 'between %s and %s' %
+                                                    (len(required), len(func.get('args'))), len(args))
+
+        for i in range(len(required)):
+            final_args[required[i]] = args[i]
+
+        for i in range(len(optional)):
+            if i + len(required) < len(args):
+                final_args[optional[i]] = args[i + len(required)]
+            else:
+                final_args[optional[i]] = func.get('args').get(optional[i])
+
+        previous = {}
+
+        for i in final_args:
+            if i in VARIABLES:
+                previous[i] = VARIABLES.get(i).get('value')
+            run_set((i, str(final_args[i])))
+
+        result = run_lines(func.get('code'), _in='function')
+
+        for i in previous:
+            run_set((i, str(previous.get(i))))
+
+        return result
+
+    return lambda groups: inner(groups)
+
+
 ########################################################################################################################
+# 2)
+#   import
+# 3)
+#   continue, break
+# 4)
+#   read lines from, write to, rewrite to
+#   regex match, regex find, regex groups
+#   add to, get from, remove at, length, in, replace, join, repeat
+#   bitwise and, bitwise xor, bitwise or, bitwise not
+# 5)
+#   floor, ceil, factorial, pi, e, log, ln, cos, acos, sin, asin, tan, atan, acosh, asinh, atanh, cosh, sinh, tanh
+#   cont. -> degrees, radians
+# 6)
+#   String Format
+# 7)
+#   Data Structures
+# 8)
+#   Classes
+# 9)
+#   Errors
+# 10)
+#   Readme.md
+#   reformat file
 
 VARIABLE_TYPES = {
     'null': {
