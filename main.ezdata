@@ -1,23 +1,29 @@
-/*set x to 17
+class person
+    constructor(name, age, id)
+        set person.name to name
+        set person.age to age
+        set person.id to id
+    end constructor
 
-function name (x = 1, y)
-    print x
-    print y
-end function
-*/
-function sum(x, y)
-    return x + y
-end function
-/*
-name(5, 4)
+    function get_id()
+        return person.id
+    end function
 
-function f3(x, y)
-    print 'huuuhhuh'
-end function
-*/
-// name(5, 4)
+    function get_name()
+        return person.name
+    end function
 
-set a to sum(5, 6)
-print a
-print sum(11, 12)
-sum(11, 12)
+    function get_age()
+        return person.age
+    end function
+
+    set privates to [person.id, get_id]
+end class
+
+set james to person('james', 25, 12345)
+
+print james.get_name()
+
+set james.age to 30
+
+print james.get_age()

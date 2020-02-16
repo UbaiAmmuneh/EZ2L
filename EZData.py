@@ -1,6 +1,6 @@
-import re
+import os
 import random
-import math
+import re
 
 
 ########################################################################################################################
@@ -18,31 +18,13 @@ class Error(Exception):
     pass
 
 
-class IdentifierDoesntMatchValue(Error):
-    pass
-
-
-def IdentifierDoesntMatchValueRaiser(identifier, value):
-    error_end = {
-        'null': 'The only allowed value is: null',
-        'boolean': 'Allowed values are: true / false',
-        'number': 'Allowed values are: any number including floating points and negatives.',
-        'string': 'Make sure to have matching quotes at start and end of string',
-        'array': 'Make sure to include array elements between [ and ]',
-        'map': 'Make sure to include map elements between { and }',
-    }
-
-    message = 'Type of %s doesn\'t match %s identifier. %s' % (identifier, value, error_end.get(identifier))
-    return IdentifierDoesntMatchValue(message)
-
-
 class UnknownIdentifier(Error):
     pass
 
 
 def UnknownIdentifierRaiser(value):
     message = 'Uknown identifier for value %s.' % value
-    return IdentifierDoesntMatchValue(message)
+    return UnknownIdentifier(message)
 
 
 class EmptyValue(Error):
@@ -374,7 +356,7 @@ def find_else_end(lines, key='if'):
 
 
 def run_command(command, previous_ops=None):
-    if command is None or previous_ops == []:
+    if command is None or previous_ops == [] or command == '':
         return SucceededValidation, command
 
     command = command.strip()
@@ -430,14 +412,13 @@ def run_command(command, previous_ops=None):
                 _groups.append(i)
 
     result = OPERATIONS[operation]['function'](_groups)
-
     updated_command = command.replace(command[match.start(): match.end()], str(result) if result is not None else '')
 
     return run_command(updated_command, ops[1:])
 
 
 def run_file(file_name='main.ezdata'):
-    with open(file_name + ('.ezdata' if file_name[-7:] != '.ezdata' else ''), 'r') as file:
+    with open(file_name + ('' if re.fullmatch(r'(.*?)\.ezdata', file_name) else '.ezdata'), 'r') as file:
         lines = ''.join(file.readlines())
 
     while '//' in lines:
@@ -590,6 +571,9 @@ def run_lines(lines, _in=None):
             if _in != 'function':
                 raise NotInRaiser(lines[i], 'return', 'function')
             return run_command(re.findall(r'\s*return\s+(.*)\s*', lines[i])[0].strip())[1]
+        elif re.fullmatch(r'\s*class\s+([_a-zA-Z]\w*)\s*', lines[i]):
+            _end_class = find_else_end(lines[i:], key='class')[1] + i
+            code = lines[i + 1: _end_class]
         else:
             run_command(lines[i])
 
@@ -802,9 +786,20 @@ def run_function(name):
     return lambda groups: inner(groups)
 
 
+def run_import(groups):
+    filename = groups[0]
+    if not re.match(r'(.*)\.ezdata', filename):
+        filename += '.ezdata'
+
+    if os.path.isfile(filename):
+        run_file(filename)
+    else:
+        raise FileNotFoundError('File %s not found' % groups[0])
+
+
 ########################################################################################################################
 # 2)
-#   import
+#   sleep, time module
 # 3)
 #   continue, break
 # 4)
@@ -854,6 +849,13 @@ VARIABLE_TYPES = {
     }
 }
 OPERATIONS = {
+    'import': {
+        'structure': r'import\s+(.*)',
+        'function': run_import,
+        'correct_form': 'import <file_name>',
+        'power': -1,
+        'args_expected': lambda i: i == 1
+    },
     'print': {
         'structure': r'print\s+(\([^\)]*\)|.*)',
         'function': run_print,
