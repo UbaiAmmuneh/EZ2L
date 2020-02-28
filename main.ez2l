@@ -1,0 +1,56 @@
+class person
+
+    variables
+        name
+        age
+        id
+    end variables
+
+    constructor(name, age, id)
+        print 'hi'
+        set person.name to name
+        set person.age to age
+        set person.id to id
+    end constructor
+
+    function get_id()
+        return person.id
+    end function
+
+    function get_name()
+        return person.name
+    end function
+
+    function get_age()
+        return person.age
+    end function
+
+    function get_info()
+        return [person.get_id(), person.get_name(), person.get_age()]
+    end function
+
+    function fact(i)
+        if i smaller than 3
+            return i
+        end if
+        return i * person.fact(i - 1)
+    end function
+
+end class
+
+create james from person initialize with 'james', 25, 12345
+
+print james.get_name()
+
+set james.age to 30
+print james.get_age() + 11
+
+print james.get_info()
+
+print james.fact(6)
+
+try
+    print 1 / 0
+catch
+    print 'shit'
+end try
