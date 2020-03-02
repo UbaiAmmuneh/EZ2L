@@ -3,6 +3,7 @@ import os
 import random
 import re
 import time
+import sys
 
 
 ########################################################################################################################
@@ -1122,111 +1123,6 @@ OPERATIONS = {
         'args_expected': lambda i: i == 1
     },
 
-    # Collection Operations
-    'get': {
-        'structure': r'get\s+((?:\-?\d+(?:\.\d+)?)+|(?:%s))\s+from\s+(%s|%s)' % (instance_r, instance_r, str_arr_map_r),
-        'function': lambda groups: run_n_arg_op(2, groups, 'get', lambda i, j: (j[1:-1] if type(j) is str else j)[i]),
-        'correct_form': 'get <index> from <operator>',
-        'power': 5,
-        'args_expected': lambda i: i == 4
-    },
-    'in': {
-        'structure': r'(.+?)\s+in\s+(%s|%s)' % (str_arr_map_r, instance_r),
-        'function': lambda groups: run_n_arg_op(2, groups, 'in', lambda i, j: i in j),
-        'correct_form': '<element> in <operator>',
-        'power': 5,
-        'args_expected': lambda i: i == 4
-    },
-    'add': {
-        'structure': r'add\s+(.+?)\s+to\s+(%s|%s)' % (str_arr_map_r, instance_r),
-        'function': run_add,
-        'correct_form': 'add <element> to <operator>',
-        'power': 5,
-        'args_expected': lambda i: i == 4
-    },
-    'slice': {
-        'structure': r'slice\s+(%s|%s)\s+from\s+((?:\-?\d+(?:\.\d+)?)+|(?:%s))\s+to\s+((?:\-?\d+(?:\.\d+)?)+|(?:%s))' %
-                     (str_arr_map_r, instance_r, instance_r, instance_r),
-        'function': lambda groups: run_n_arg_op(3, [groups[0]] + groups[2:4] if groups[1] in ['"', "'"] else groups,
-                                                'slice',
-                                                lambda i, j, k: ('"%s"' % i[j:k] if type(i) is str else i[j:k])),
-        'correct_form': 'slice <operator> from <start> to <end>',
-        'power': 5,
-        'args_expected': lambda i: i == 5
-    },
-
-    # Logical Operations
-    'or': {
-        'structure': r'(\S+)\s+or\s+(\S+)',
-        'function': lambda groups: run_n_arg_op(2, groups, 'or', lambda a, b: a or b, 'number',
-                                                _types=['number', 'boolean']),
-        'correct_form': '<operator1> or <operator2>',
-        'power': 1,
-        'args_expected': lambda i: i == 2
-    },
-    'xor': {
-        'structure': r'(\S+)\s+xor\s+(\S+)',
-        'function': lambda groups: run_n_arg_op(2, groups, 'xor', lambda a, b: a ^ b, 'number',
-                                                _types=['number', 'boolean']),
-        'correct_form': '<operator1> xor <operator2>',
-        'power': 1.5,
-        'args_expected': lambda i: i == 2
-    },
-    'and': {
-        'structure': r'(\S+)\s+and\s+(\S+)',
-        'function': lambda groups: run_n_arg_op(2, groups, 'and', lambda a, b: a and b, _types=['number', 'boolean']),
-        'correct_form': '<operator1> and <operator2>',
-        'power': 2,
-        'args_expected': lambda i: i == 2
-    },
-    'not': {
-        'structure': r'not\s+(\S+)',
-        'function': lambda groups: run_n_arg_op(1, groups, 'not', lambda x: not x, _types=['number', 'boolean']),
-        'correct_form': 'not <operator>',
-        'power': 3,
-        'args_expected': lambda i: i == 1
-    },
-    'shift left': {
-        'structure': r'(\S+)\s+shift left\s+(\S+)',
-        'function': lambda groups: run_n_arg_op(2, groups, 'shift left', lambda a, b: a << b,
-                                                _types=['number', 'boolean']),
-        'correct_form': '<operator1> shift left <operator2>',
-        'power': 5,
-        'args_expected': lambda i: i == 2
-    },
-    'shift right': {
-        'structure': r'(\S+)\s+shift right\s+(\S+)',
-        'function': lambda groups: run_n_arg_op(2, groups, 'shift right', lambda a, b: a >> b,
-                                                _types=['number', 'boolean']),
-        'correct_form': '<operator1> shift right <operator2>',
-        'power': 5,
-        'args_expected': lambda i: i == 2
-    },
-    'bitand': {
-        'structure': r'(%s)\s+bitand\s+(%s)' % (instance_number_r, instance_number_r),
-        'function': lambda groups: run_n_arg_op(2, groups, 'bitand', lambda a, b: a & b, 'number',
-                                                _types=['number', 'boolean']),
-        'correct_form': '<operator1> bitand <operator2>',
-        'power': 5,
-        'args_expected': lambda i: i == 2
-    },
-    'bitor': {
-        'structure': r'(%s)\s+bitor\s+(%s)' % (instance_number_r, instance_number_r),
-        'function': lambda groups: run_n_arg_op(2, groups, 'bitor', lambda a, b: a | b, 'number',
-                                                _types=['number', 'boolean']),
-        'correct_form': '<operator1> bitor <operator2>',
-        'power': 5,
-        'args_expected': lambda i: i == 2
-    },
-    'bitnot': {
-        'structure': r'bitnot\s+(%s)' % instance_number_r,
-        'function': lambda groups: run_n_arg_op(1, groups, 'bitnot', lambda a: ~ a, 'number',
-                                                _types=['number', 'boolean']),
-        'correct_form': 'bitnot <operator2>',
-        'power': 5,
-        'args_expected': lambda i: i == i
-    },
-
     # Comparison Operations
     'equals': {
         'structure': r'(\S+)\s+equals\s+(\S+)',
@@ -1275,27 +1171,77 @@ OPERATIONS = {
         'args_expected': lambda i: i == 2
     },
 
-    # Random Operations
-    'pick from': {
-        'structure': r'pick\s+from\s+(\S.*)',
-        'function': lambda groups: run_n_arg_op(1, groups, 'pick from', lambda i: random.choice(i), _type='array'),
-        'correct_form': 'pick from <array>',
-        'power': 10,
-        'args_expected': lambda i: i == 1
+    # Collection Operations
+    'get': {
+        'structure': r'get\s+((?:\-?\d+(?:\.\d+)?)+|(?:%s))\s+from\s+(%s|%s)' % (instance_r, instance_r, str_arr_map_r),
+        'function': lambda groups: run_n_arg_op(2, groups, 'get', lambda i, j: (j[1:-1] if type(j) is str else j)[i]),
+        'correct_form': 'get <index> from <operator>',
+        'power': 5,
+        'args_expected': lambda i: i == 4
     },
-    'shuffle': {
-        'structure': r'shuffle\s+(%s)' % instance_r,
-        'function': run_shuffle,
-        'correct_form': 'shuffle <array>',
-        'power': 10,
-        'args_expected': lambda i: i == 1
+    'in': {
+        'structure': r'(.+?)\s+in\s+(%s|%s)' % (str_arr_map_r, instance_r),
+        'function': lambda groups: run_n_arg_op(2, groups, 'in', lambda i, j: i in j),
+        'correct_form': '<element> in <operator>',
+        'power': 5,
+        'args_expected': lambda i: i == 4
     },
-    'pick number': {
-        'structure': r'pick\s+number\s+start\s+(\S+)\s+stop\s+(\S+)\s*?(?: jump\s+(\S.*))?',
-        'function': run_pick,
-        'correct_form': 'pick number start <start> stop <end> (jump <jump>)',
-        'power': 10,
-        'args_expected': lambda i: 3 >= i >= 2
+    'add': {
+        'structure': r'add\s+(.+?)\s+to\s+(%s|%s)' % (str_arr_map_r, instance_r),
+        'function': run_add,
+        'correct_form': 'add <element> to <operator>',
+        'power': 5,
+        'args_expected': lambda i: i == 4
+    },
+    'slice': {
+        'structure': r'slice\s+(%s|%s)\s+from\s+((?:\-?\d+(?:\.\d+)?)+|(?:%s))\s+to\s+((?:\-?\d+(?:\.\d+)?)+|(?:%s))' %
+                     (str_arr_map_r, instance_r, instance_r, instance_r),
+        'function': lambda groups: run_n_arg_op(3, [groups[0]] + groups[2:4] if groups[1] in ['"', "'"] else groups,
+                                                'slice',
+                                                lambda i, j, k: ('"%s"' % i[j:k] if type(i) is str else i[j:k])),
+        'correct_form': 'slice <operator> from <start> to <end>',
+        'power': 5,
+        'args_expected': lambda i: i == 5
+    },
+    'length': {
+        'structure': r'length\s+of\s+(%s|%s)' % (str_arr_map_r, instance_r),
+        'function': lambda groups: run_n_arg_op(1, groups, 'length', lambda i: len(i) - (2 if type(i) is str else 0),
+                                                _types=['array', 'string', 'map']),
+        'correct_form': 'length of <operator>',
+        'power': 5,
+        'args_expected': lambda i: i == 3
+    },
+
+    # Logical Operations
+    'or': {
+        'structure': r'(\S+)\s+or\s+(\S+)',
+        'function': lambda groups: run_n_arg_op(2, groups, 'or', lambda a, b: a or b, 'number',
+                                                _types=['number', 'boolean']),
+        'correct_form': '<operator1> or <operator2>',
+        'power': 1,
+        'args_expected': lambda i: i == 2
+    },
+    'xor': {
+        'structure': r'(\S+)\s+xor\s+(\S+)',
+        'function': lambda groups: run_n_arg_op(2, groups, 'xor', lambda a, b: a ^ b, 'number',
+                                                _types=['number', 'boolean']),
+        'correct_form': '<operator1> xor <operator2>',
+        'power': 1.5,
+        'args_expected': lambda i: i == 2
+    },
+    'and': {
+        'structure': r'(\S+)\s+and\s+(\S+)',
+        'function': lambda groups: run_n_arg_op(2, groups, 'and', lambda a, b: a and b, _types=['number', 'boolean']),
+        'correct_form': '<operator1> and <operator2>',
+        'power': 2,
+        'args_expected': lambda i: i == 2
+    },
+    'not': {
+        'structure': r'not\s+(\S+)',
+        'function': lambda groups: run_n_arg_op(1, groups, 'not', lambda x: not x, _types=['number', 'boolean']),
+        'correct_form': 'not <operator>',
+        'power': 3,
+        'args_expected': lambda i: i == 1
     },
 
     # Numeric Operations
@@ -1350,9 +1296,9 @@ OPERATIONS = {
         'args_expected': lambda i: i == 1
     },
     'abs': {
-        'structure': r'abs\s+((?:\-?\d+(?:\.\d+)?)+|(?:%s))' % instance_r,
+        'structure': r'abs\s+of\s+((?:\-?\d+(?:\.\d+)?)+|(?:%s))' % instance_r,
         'function': lambda groups: run_n_arg_op(1, groups, 'abs', lambda i: abs(i), _type='number'),
-        'correct_form': 'abs <operator>',
+        'correct_form': 'abs of <operator>',
         'power': 5,
         'args_expected': lambda i: i == 1
     },
@@ -1385,84 +1331,84 @@ OPERATIONS = {
         'power': 5,
         'args_expected': lambda i: i == 2
     },
-    'sin': {
+    ' sin ': {
         'structure': r'sin\s+((?:\-?\d+(?:\.\d+)?)+|(?:%s))' % instance_r,
         'function': lambda groups: run_n_arg_op(1, groups, 'sin', lambda i: math.sin(i), _type='number'),
         'correct_form': 'sin <operator>',
         'power': 5,
         'args_expected': lambda i: i == 1
     },
-    'cos': {
+    ' cos ': {
         'structure': r'cos\s+((?:\-?\d+(?:\.\d+)?)+|(?:%s))' % instance_r,
         'function': lambda groups: run_n_arg_op(1, groups, 'cos', lambda i: math.cos(i), _type='number'),
         'correct_form': 'cos <operator>',
         'power': 5,
         'args_expected': lambda i: i == 1
     },
-    'tan': {
+    ' tan ': {
         'structure': r'tan\s+((?:\-?\d+(?:\.\d+)?)+|(?:%s))' % instance_r,
         'function': lambda groups: run_n_arg_op(1, groups, 'tan', lambda i: math.tan(i), _type='number'),
         'correct_form': 'tan <operator>',
         'power': 5,
         'args_expected': lambda i: i == 1
     },
-    'asin': {
+    ' asin ': {
         'structure': r'asin\s+((?:\-?\d+(?:\.\d+)?)+|(?:%s))' % instance_r,
         'function': lambda groups: run_n_arg_op(1, groups, 'asin', lambda i: math.asin(i), _type='number'),
         'correct_form': 'asin <operator>',
         'power': 5,
         'args_expected': lambda i: i == 1
     },
-    'acos': {
+    ' acos ': {
         'structure': r'acos\s+((?:\-?\d+(?:\.\d+)?)+|(?:%s))' % instance_r,
         'function': lambda groups: run_n_arg_op(1, groups, 'acos', lambda i: math.acos(i), _type='number'),
         'correct_form': 'acos <operator>',
         'power': 5,
         'args_expected': lambda i: i == 1
     },
-    'atan': {
+    ' atan ': {
         'structure': r'atan\s+((?:\-?\d+(?:\.\d+)?)+|(?:%s))' % instance_r,
         'function': lambda groups: run_n_arg_op(1, groups, 'atan', lambda i: math.atan(i), _type='number'),
         'correct_form': 'atan <operator>',
         'power': 5,
         'args_expected': lambda i: i == 1
     },
-    'sinh': {
+    ' sinh ': {
         'structure': r'sinh\s+((?:\-?\d+(?:\.\d+)?)+|(?:%s))' % instance_r,
         'function': lambda groups: run_n_arg_op(1, groups, 'sinh', lambda i: math.sinh(i), _type='number'),
         'correct_form': 'sinh <operator>',
         'power': 5,
         'args_expected': lambda i: i == 1
     },
-    'cosh': {
+    ' cosh ': {
         'structure': r'cosh\s+((?:\-?\d+(?:\.\d+)?)+|(?:%s))' % instance_r,
         'function': lambda groups: run_n_arg_op(1, groups, 'cosh', lambda i: math.cosh(i), _type='number'),
         'correct_form': 'cosh <operator>',
         'power': 5,
         'args_expected': lambda i: i == 1
     },
-    'tanh': {
+    ' tanh ': {
         'structure': r'tanh\s+((?:\-?\d+(?:\.\d+)?)+|(?:%s))' % instance_r,
         'function': lambda groups: run_n_arg_op(1, groups, 'tanh', lambda i: math.tanh(i), _type='number'),
         'correct_form': 'tanh <operator>',
         'power': 5,
         'args_expected': lambda i: i == 1
     },
-    'asinh': {
+    ' asinh ': {
         'structure': r'asinh\s+((?:\-?\d+(?:\.\d+)?)+|(?:%s))' % instance_r,
         'function': lambda groups: run_n_arg_op(1, groups, 'asinh', lambda i: math.asinh(i), _type='number'),
         'correct_form': 'asinh <operator>',
         'power': 5,
         'args_expected': lambda i: i == 1
     },
-    'acosh': {
+    ' acosh ': {
         'structure': r'acosh\s+((?:\-?\d+(?:\.\d+)?)+|(?:%s))' % instance_r,
         'function': lambda groups: run_n_arg_op(1, groups, 'acosh', lambda i: math.acosh(i), _type='number'),
         'correct_form': 'acosh <operator>',
         'power': 5,
         'args_expected': lambda i: i == 1
     },
-    'atanh': {
+    ' atanh ': {
         'structure': r'atanh\s+((?:\-?\d+(?:\.\d+)?)+|(?:%s))' % instance_r,
         'function': lambda groups: run_n_arg_op(1, groups, 'atanh', lambda i: math.atanh(i), _type='number'),
         'correct_form': 'atanh <operator>',
@@ -1490,17 +1436,74 @@ OPERATIONS = {
         'power': 5,
         'args_expected': lambda i: i == 1
     },
-    'length': {
-        'structure': r'length\s+of\s+(%s|%s)' % (str_arr_map_r, instance_r),
-        'function': lambda groups: run_n_arg_op(1, groups, 'length', lambda i: len(i) - (2 if type(i) is str else 0),
-                                                _types=['array', 'string', 'map']),
-        'correct_form': 'length of <operator>',
+
+    # Bitwise Operations
+    'shift left': {
+        'structure': r'(\S+)\s+shift left\s+(\S+)',
+        'function': lambda groups: run_n_arg_op(2, groups, 'shift left', lambda a, b: a << b,
+                                                _types=['number', 'boolean']),
+        'correct_form': '<operator1> shift left <operator2>',
         'power': 5,
-        'args_expected': lambda i: i == 3
+        'args_expected': lambda i: i == 2
+    },
+    'shift right': {
+        'structure': r'(\S+)\s+shift right\s+(\S+)',
+        'function': lambda groups: run_n_arg_op(2, groups, 'shift right', lambda a, b: a >> b,
+                                                _types=['number', 'boolean']),
+        'correct_form': '<operator1> shift right <operator2>',
+        'power': 5,
+        'args_expected': lambda i: i == 2
+    },
+    'bitand': {
+        'structure': r'(%s)\s+bitand\s+(%s)' % (instance_number_r, instance_number_r),
+        'function': lambda groups: run_n_arg_op(2, groups, 'bitand', lambda a, b: a & b, 'number',
+                                                _types=['number', 'boolean']),
+        'correct_form': '<operator1> bitand <operator2>',
+        'power': 5,
+        'args_expected': lambda i: i == 2
+    },
+    'bitor': {
+        'structure': r'(%s)\s+bitor\s+(%s)' % (instance_number_r, instance_number_r),
+        'function': lambda groups: run_n_arg_op(2, groups, 'bitor', lambda a, b: a | b, 'number',
+                                                _types=['number', 'boolean']),
+        'correct_form': '<operator1> bitor <operator2>',
+        'power': 5,
+        'args_expected': lambda i: i == 2
+    },
+    'bitnot': {
+        'structure': r'bitnot\s+(%s)' % instance_number_r,
+        'function': lambda groups: run_n_arg_op(1, groups, 'bitnot', lambda a: ~ a, 'number',
+                                                _types=['number', 'boolean']),
+        'correct_form': 'bitnot <operator2>',
+        'power': 5,
+        'args_expected': lambda i: i == i
+    },
+
+    # Random Operations
+    'pick from': {
+        'structure': r'pick\s+from\s+(\S.*)',
+        'function': lambda groups: run_n_arg_op(1, groups, 'pick from', lambda i: random.choice(i), _type='array'),
+        'correct_form': 'pick from <array>',
+        'power': 10,
+        'args_expected': lambda i: i == 1
+    },
+    'shuffle': {
+        'structure': r'shuffle\s+(%s)' % instance_r,
+        'function': run_shuffle,
+        'correct_form': 'shuffle <array>',
+        'power': 10,
+        'args_expected': lambda i: i == 1
+    },
+    'pick number': {
+        'structure': r'pick\s+number\s+start\s+(\S+)\s+stop\s+(\S+)\s*?(?: jump\s+(\S.*))?',
+        'function': run_pick,
+        'correct_form': 'pick number start <start> stop <end> (jump <jump>)',
+        'power': 10,
+        'args_expected': lambda i: 3 >= i >= 2
     },
 
     # Time Operations
-    'time': {
+    ' time': {
         'structure': r'(time)',
         'function': lambda groups: time.time(),
         'correct_form': 'time',
@@ -1509,7 +1512,7 @@ OPERATIONS = {
     },
     'ctime': {
         'structure': r'ctime\s+(%s)' % instance_number_r,
-        'function': lambda groups: run_n_arg_op(1, groups, 'ctime', lambda i: time.ctime(i), _type='number'),
+        'function': lambda groups: run_n_arg_op(1, groups, 'ctime', lambda i: '"%s"' % time.ctime(i), _type='number'),
         'correct_form': 'ctime <seconds>',
         'power': 10,
         'args_expected': lambda i: i == 1
@@ -1581,4 +1584,6 @@ CLASSES = {}
 OBJECTS = {}
 
 if __name__ == '__main__':
-    run_file()
+    args = sys.argv
+    if len(args) == 2:
+        run_file(args[1])
