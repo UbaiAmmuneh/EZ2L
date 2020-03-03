@@ -116,6 +116,21 @@ You can change the postfix of the printed output (which is by default `\n`) usin
     Enter your name: Ubai
     Hi, Ubai !
 
+## Comments
+There are 2 types of comments that can be used in **EZ2L**:
++ Single-Line Comment: which is a comment that starts somewhere in a line of code, and end on the end of the line.
+**Syntax**: `// Comment ...`
++ Multi-Line Comment: which is a comment that its start and end are set, and can exceed the one line.
+**Syntax**: `/* Comment */`.
+
+**Example**:
+
+    // This is a comment
+    
+    /* This is
+       a multi-line
+       comment */
+
 ## Collection Operations
 
 | Command  |                    Syntax                    |                                           Usage                                    |                   Example                        |
