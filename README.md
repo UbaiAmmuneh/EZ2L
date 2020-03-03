@@ -415,7 +415,7 @@ Declaring a class object is done using the `create` keyword.
     
     Output:
     333
-    {'name': 'John', 'id': 123, 'gender': 'Male'}
+    {'name': 'John', 'id': 333, 'gender': 'Male'}
     
             
 
