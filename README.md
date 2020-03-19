@@ -88,7 +88,7 @@ Variables naming rules:
 \* `print` is a keyword explained below.
 
 ## Input / Output
-####Inputs are taken from user using the `input` keyword.
+#### Inputs are taken from user using the `input` keyword.
 
 **Syntax**: `input`
 
@@ -96,7 +96,7 @@ A message can be printed before the input using:
 
 **Syntax**: `input message <message>`
 
-####Outputs to the screen are done using the `print` keyword.
+#### Outputs to the screen are done using the `print` keyword.
 
 **Syntax**: `print <output>`.
 
@@ -493,4 +493,26 @@ Declaring a class object is done using the `create` keyword.
     
     Output:
     5
+
+#### The `try` operations
+`try` is used to catch errors in program.
+
+**Syntax**: 
+
+    try
+        <CODE>
+    catch
+        <CODE>
+    end try
+
+**Example**:
+
+    try
+        print 1 / 0
+    catch
+        print 'Cant divide 1 by 0'
+    end try
+
+    Output:
+    Cant divide 1 by 0
     
