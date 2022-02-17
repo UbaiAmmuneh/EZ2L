@@ -261,7 +261,7 @@ For-From-To loops on all numbers starting at `<start>` up to `<end>` **including
 
 **Example**:
 
-    for i form 1 to 10 jump 2
+    for i from 1 to 10 jump 2
         if i smaller than 9
             print i end with ', '
         else
