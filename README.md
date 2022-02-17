@@ -103,13 +103,13 @@ A message can be printed before the input using:
 Note that the `print` keyword prints the output on one line then goes to a new line.
 You can change the postfix of the printed output (which is by default `\n`) using:
 
-**Syntax**: `print <output> end <postfix>`
+**Syntax**: `print <output> end with <postfix>`
 
 **Example**:
 
     set x to input message 'Enter your name: '
-    print 'Hi,' end ' '
-    print x end ' !'
+    print 'Hi,' end with ' '
+    print x end with ' !'
     
     Output:
     
@@ -263,7 +263,7 @@ For-From-To loops on all numbers starting at `<start>` up to `<end>` **including
 
     for i form 1 to 10 jump 2
         if i smaller than 9
-            print i end ', '
+            print i end with ', '
         else
             print i
         end if
@@ -287,7 +287,7 @@ For-In loops are used to loop on a specific collection (array / map).
 
     for i in [1, 2, 3, 4, 5]
         if i smaller than 5
-            print i end ', '
+            print i end with ', '
         else
             print i
         end if
@@ -313,7 +313,7 @@ While Loops are used to run code while a condition is `true`, once it turns `fal
     
     while x smaller than 10
         if x smaller than 9
-            print i end ', '
+            print i end with ', '
         else
             print i
         end if
