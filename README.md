@@ -135,7 +135,7 @@ There are 2 types of comments that can be used in **EZ2L**:
 
 | Command  |                    Syntax                    |                                           Usage                                    |                   Example                        |
 | -------- | -------------------------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------ |
-| `get`    | `get <index> from <collection>`              | Used to get an element in specific index in collection                             | `get 0 in [1, 2, 3]` --> `1`                     |
+| `get`    | `get <index> from <collection>`              | Used to get an element in specific index in collection                             | `get 0 from [1, 2, 3]` --> `1`                     |
 | `in`     | `<element> in <collection>`                  | Used to check if element is in collection                                          | `3 in [1, 2, 3]` --> `true`                      |
 | `add`    | `add <element> to <collection>`              | Used to add element to collection                                                  | `add [4] to [1, 2, 3]` --> `[1, 2, 3, 4]`        |
 | `slice`  | `slice <collection> from <start> to <end>`   | Used to slice a collection to get all elements from index `<start>` to `<end> - 1` | `slice [1, 2, 3, 4, 5] from 1 to 3` --> `[2, 3]` |
