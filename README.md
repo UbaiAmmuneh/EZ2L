@@ -271,7 +271,7 @@ For-From-To loops on all numbers starting at `<start>` up to `<end>` **including
     
     Output:
     
-     1, 3, 5, 9
+     1, 3, 5, 7, 9
      
  #### For-In Loop
  
